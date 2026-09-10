@@ -1,0 +1,26 @@
+# Perfil local: H2 persistente, consola de desarrollo, Flyway y CORS para Vite.
+spring:
+  datasource:
+    url: jdbc:h2:file:./data/buenplato;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+  flyway:
+    locations:
+      - classpath:db/migration
+      - classpath:db/seed/dev
+
+  security:
+    user:
+      name: admin
+      password: admin123
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+app:
+  cors:
+    allowed-origin-patterns: "*"

@@ -1,0 +1,14 @@
+# Perfil Docker: conserva PostgreSQL de producción y agrega datos idempotentes
+# de demostración para poder probar login, inventario, ventas y finanzas.
+spring:
+  flyway:
+    locations:
+      - classpath:db/migration
+      - classpath:db/seed/docker
+  h2:
+    console:
+      enabled: false
+
+server:
+  port: 8080
+  forward-headers-strategy: framework

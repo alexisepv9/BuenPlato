@@ -1,0 +1,9 @@
+# Perfil productivo: PostgreSQL y secretos suministrados mediante variables de entorno.
+spring:
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/buenplato}
+    username: ${POSTGRES_USER:buenplato}
+    # Producción debe fallar de forma segura si el secreto no fue suministrado.
+    password: ${POSTGRES_PASSWORD}
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect

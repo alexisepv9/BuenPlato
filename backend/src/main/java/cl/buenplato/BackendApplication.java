@@ -1,0 +1,14 @@
+/**
+ * Punto de entrada de Buen Plato API; inicia Spring Boot y sus módulos.
+ */
+package cl.buenplato;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class BackendApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(BackendApplication.class, args);
+    }
+}

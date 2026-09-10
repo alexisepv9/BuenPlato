@@ -1,0 +1,76 @@
+# Entorno completo de Buen Plato para pruebas locales y posterior traslado a EC2.
+name: buenplato
+
+services:
+  database:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-buenplato}
+      POSTGRES_USER: ${POSTGRES_USER:-buenplato}
+      # Compose se detiene con un mensaje claro si falta el secreto.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Crea .env y define POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      # Solo queda accesible desde el mismo computador, nunca desde Internet.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    networks:
+      - internal
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod,docker
+      DATABASE_URL: jdbc:postgresql://database:5432/${POSTGRES_DB:-buenplato}
+      POSTGRES_USER: ${POSTGRES_USER:-buenplato}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Crea .env y define POSTGRES_PASSWORD}
+      APP_CORS_ALLOWED_ORIGIN_PATTERNS: ${APP_CORS_ALLOWED_ORIGIN_PATTERNS:-http://localhost,http://127.0.0.1}
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Xms128m -Xmx512m -XX:+UseSerialGC}
+    depends_on:
+      database:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/api/health"]
+      interval: 10s
+      timeout: 4s
+      retries: 12
+      start_period: 35s
+    networks:
+      - internal
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-80}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      # 127.0.0.1 evita que wget resuelva "localhost" como IPv6 (::1),
+      # porque este servidor Nginx escucha en IPv4 dentro del contenedor.
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/healthz"]
+      interval: 10s
+      timeout: 4s
+      retries: 6
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  postgres-data:

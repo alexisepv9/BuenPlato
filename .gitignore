@@ -1,0 +1,24 @@
+.idea/
+.vscode/
+.env
+# Inventario privado de accesos locales. Nunca debe publicarse.
+CUENTAS_LOCALES.md
+*.pem
+*.key
+*.p12
+*.jks
+*.log
+.tools/
+tmp/
+
+backend/target/
+backend/.mvn/wrapper/maven-wrapper.jar
+backend/data/
+
+frontend/node_modules/
+frontend/dist/
+frontend/vite.config.js
+frontend/vite.config.d.ts
+frontend/*.tsbuildinfo
+
+postgres-data/

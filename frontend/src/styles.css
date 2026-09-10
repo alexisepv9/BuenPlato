@@ -1,0 +1,36 @@
+/*
+ * Buen Plato — sistema visual global.
+ * Define tipografía, paleta semántica y reglas base compartidas por Venta,
+ * Inventario, Finanzas y autenticación. Los componentes deben reutilizar estos
+ * tokens para mantener contraste y consistencia en toda la aplicación.
+ */
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  /* Paleta estándar: un color cumple siempre la misma función. */
+  --color-brand: #d85d3d;
+  --color-brand-dark: #a94635;
+  --color-accent: #994353;
+  --color-cream: #fff8ef;
+  --color-surface: #fffdf9;
+  --color-terracotta: #d85d3d;
+  --color-saffron: #f2b544;
+  --color-berry: #994353;
+  --color-aqua: #4c93a6;
+  --color-charcoal: #332a2a;
+  --color-muted: #756c68;
+  --color-border: #eadfd4;
+  --color-success: #6f8f54;
+}
+
+@layer base {
+  body {
+    @apply m-0 min-w-80 bg-cream font-sans text-charcoal antialiased;
+  }
+
+  button {
+    @apply cursor-pointer;
+  }
+}
