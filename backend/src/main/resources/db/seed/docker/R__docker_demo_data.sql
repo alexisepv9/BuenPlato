@@ -36,12 +36,17 @@ VALUES
   ((SELECT id FROM categories WHERE slug='proteinas'), 'PRO-011', 'Carne mechada', 'Vacuno cocido lentamente', 4800, 'porciones', 35, 8, TRUE, TRUE),
   ((SELECT id FROM categories WHERE slug='agregados'), 'AGR-010', 'Arroz primavera', 'Arroz con vegetales de estación', 1600, 'porciones', 90, 18, TRUE, TRUE),
   ((SELECT id FROM categories WHERE slug='agregados'), 'AGR-011', 'Papas rústicas', 'Papas al horno con romero', 1900, 'porciones', 70, 15, TRUE, TRUE),
+  ((SELECT id FROM categories WHERE slug='agregados'), 'AGR-012', 'Arroz blanco', 'Arroz blanco graneado', 1400, 'porciones', 60, 12, TRUE, TRUE),
+  ((SELECT id FROM categories WHERE slug='agregados'), 'AGR-013', 'Tallarines con salsa roja', 'Pasta con salsa de tomate', 1900, 'porciones', 48, 10, TRUE, TRUE),
+  ((SELECT id FROM categories WHERE slug='agregados'), 'AGR-014', 'Tallarines con salsa verde', 'Pasta con salsa de albahaca', 2100, 'porciones', 48, 10, TRUE, TRUE),
   ((SELECT id FROM categories WHERE slug='ensaladas'), 'ENS-010', 'Ensalada fresca', 'Lechuga, pepino y zanahoria', 1500, 'porciones', 55, 12, TRUE, TRUE),
   ((SELECT id FROM categories WHERE slug='ensaladas'), 'ENS-011', 'Ensalada chilena', 'Tomate y cebolla pluma', 1600, 'porciones', 45, 10, TRUE, TRUE),
   ((SELECT id FROM categories WHERE slug='postres'), 'POS-010', 'Fruta de estación', 'Porción individual', 1400, 'porciones', 40, 8, TRUE, TRUE),
   ((SELECT id FROM categories WHERE slug='bebestibles'), 'BEB-010', 'Bebida lata', 'Lata 350 ml', 1500, 'unidades', 72, 15, TRUE, TRUE),
   ((SELECT id FROM categories WHERE slug='bebestibles'), 'BEB-011', 'Agua mineral', 'Botella 500 ml', 1200, 'unidades', 80, 15, TRUE, TRUE),
   ((SELECT id FROM categories WHERE slug='bebestibles'), 'BEB-012', 'Jugo natural', 'Vaso 400 ml', 1800, 'unidades', 30, 8, TRUE, TRUE),
+  ((SELECT id FROM categories WHERE slug='bebestibles'), 'BEB-013', 'Agua Cachantun 1 L', 'Botella individual de un litro', 1800, 'unidades', 24, 6, TRUE, TRUE),
+  ((SELECT id FROM categories WHERE slug='bebestibles'), 'BEB-014', 'Bebida Express 500 ml', 'Botella individual', 1700, 'unidades', 24, 6, TRUE, TRUE),
   ((SELECT id FROM categories WHERE slug='extras'), 'EXT-010', 'Empanada de queso', 'Unidad horneada', 1800, 'unidades', 24, 6, TRUE, TRUE)
 ON CONFLICT (sku) DO UPDATE SET
   category_id = EXCLUDED.category_id,
@@ -92,6 +97,9 @@ VALUES
   ((SELECT ms.id FROM menu_sections ms JOIN menus m ON m.id=ms.menu_id JOIN categories c ON c.id=ms.category_id WHERE m.name='Almuerzo Buffet' AND c.slug='proteinas'), (SELECT id FROM products WHERE sku='PRO-001'), 2000, TRUE),
   ((SELECT ms.id FROM menu_sections ms JOIN menus m ON m.id=ms.menu_id JOIN categories c ON c.id=ms.category_id WHERE m.name='Almuerzo Buffet' AND c.slug='agregados'), (SELECT id FROM products WHERE sku='AGR-010'), 0, TRUE),
   ((SELECT ms.id FROM menu_sections ms JOIN menus m ON m.id=ms.menu_id JOIN categories c ON c.id=ms.category_id WHERE m.name='Almuerzo Buffet' AND c.slug='agregados'), (SELECT id FROM products WHERE sku='AGR-011'), 0, TRUE),
+  ((SELECT ms.id FROM menu_sections ms JOIN menus m ON m.id=ms.menu_id JOIN categories c ON c.id=ms.category_id WHERE m.name='Almuerzo Buffet' AND c.slug='agregados'), (SELECT id FROM products WHERE sku='AGR-012'), 0, TRUE),
+  ((SELECT ms.id FROM menu_sections ms JOIN menus m ON m.id=ms.menu_id JOIN categories c ON c.id=ms.category_id WHERE m.name='Almuerzo Buffet' AND c.slug='agregados'), (SELECT id FROM products WHERE sku='AGR-013'), 0, TRUE),
+  ((SELECT ms.id FROM menu_sections ms JOIN menus m ON m.id=ms.menu_id JOIN categories c ON c.id=ms.category_id WHERE m.name='Almuerzo Buffet' AND c.slug='agregados'), (SELECT id FROM products WHERE sku='AGR-014'), 0, TRUE),
   ((SELECT ms.id FROM menu_sections ms JOIN menus m ON m.id=ms.menu_id JOIN categories c ON c.id=ms.category_id WHERE m.name='Almuerzo Buffet' AND c.slug='agregados'), (SELECT id FROM products WHERE sku='AGR-001'), 500, TRUE),
   ((SELECT ms.id FROM menu_sections ms JOIN menus m ON m.id=ms.menu_id JOIN categories c ON c.id=ms.category_id WHERE m.name='Almuerzo Buffet' AND c.slug='ensaladas'), (SELECT id FROM products WHERE sku='ENS-010'), 0, TRUE),
   ((SELECT ms.id FROM menu_sections ms JOIN menus m ON m.id=ms.menu_id JOIN categories c ON c.id=ms.category_id WHERE m.name='Almuerzo Buffet' AND c.slug='ensaladas'), (SELECT id FROM products WHERE sku='ENS-011'), 0, TRUE),
@@ -116,3 +124,40 @@ ON CONFLICT (reference_code) DO UPDATE SET
   expense_type = EXCLUDED.expense_type,
   amount = EXCLUDED.amount,
   payment_method = EXCLUDED.payment_method;
+
+-- Materias primas y recetas iniciales. DO NOTHING preserva stock y ajustes administrativos.
+INSERT INTO ingredients (sku,name,base_unit,stock,low_stock_threshold,unit_cost,active) VALUES
+('MP-CARNE','Carne de vacuno','G',10000,2000,8.5000,TRUE),('MP-POLLO','Pechuga de pollo','G',10000,2000,5.5000,TRUE),('MP-SALMON','Salmón','G',5000,1000,12.0000,TRUE),
+('MP-SAL','Sal','G',1000,200,0.8000,TRUE),('MP-ZANAHORIA','Zanahoria','G',5000,1000,1.2000,TRUE),('MP-CEBOLLA','Cebolla','G',5000,1000,1.1000,TRUE),
+('MP-AJO','Ajo','UNIT',100,20,120.0000,TRUE),('MP-ARROZ','Arroz','G',10000,2000,1.6000,TRUE),('MP-ACEITE','Aceite vegetal','ML',5000,1000,2.2000,TRUE),
+('MP-VEGETALES','Vegetales mixtos','G',8000,1500,2.5000,TRUE),('MP-PAPA','Papa','G',12000,2500,1.3000,TRUE),('MP-ROMERO','Romero','G',300,50,8.0000,TRUE),
+('MP-LECHUGA','Lechuga','G',4000,800,2.2000,TRUE),('MP-PEPINO','Pepino','G',4000,800,1.8000,TRUE),('MP-TOMATE','Tomate','G',8000,1500,2.0000,TRUE),
+('MP-CHOCOLATE','Chocolate','G',3000,500,8.0000,TRUE),('MP-CREMA','Crema','ML',4000,800,3.0000,TRUE),('MP-AZUCAR','Azúcar','G',4000,800,1.1000,TRUE),
+('MP-FRUTA','Fruta de estación','G',8000,1500,2.2000,TRUE),('MP-HARINA','Harina','G',10000,2000,1.0000,TRUE),('MP-QUESO','Queso','G',5000,1000,5.5000,TRUE),
+('MP-PASTA','Tallarines secos','G',10000,2000,1.8000,TRUE),('MP-SALSA-TOMATE','Salsa de tomate','G',6000,1200,2.3000,TRUE),('MP-ALBAHACA','Albahaca','G',1000,200,9.0000,TRUE)
+ON CONFLICT (sku) DO NOTHING;
+
+INSERT INTO recipes(product_id,yield_quantity,active)
+SELECT p.id,v.yield_quantity,TRUE FROM (VALUES
+('PRO-001',4),('PRO-010',4),('PRO-011',4),('AGR-001',4),('AGR-010',8),('AGR-011',6),('AGR-012',8),('AGR-013',8),('AGR-014',8),
+('ENS-010',6),('ENS-011',6),('POS-001',6),('POS-010',6),('EXT-010',12)
+) v(sku,yield_quantity) JOIN products p ON p.sku=v.sku ON CONFLICT (product_id) DO NOTHING;
+
+INSERT INTO recipe_ingredients(recipe_id,ingredient_id,quantity)
+SELECT r.id,i.id,v.quantity FROM (VALUES
+('PRO-001','MP-SALMON',800),('PRO-001','MP-SAL',12),('PRO-001','MP-ACEITE',20),
+('PRO-010','MP-POLLO',800),('PRO-010','MP-SAL',12),('PRO-010','MP-ACEITE',20),('PRO-010','MP-AJO',2),
+('PRO-011','MP-CARNE',1000),('PRO-011','MP-SAL',6),('PRO-011','MP-ZANAHORIA',100),('PRO-011','MP-CEBOLLA',100),('PRO-011','MP-AJO',2),
+('AGR-001','MP-VEGETALES',1000),('AGR-001','MP-ACEITE',30),('AGR-001','MP-SAL',8),
+('AGR-010','MP-ARROZ',1000),('AGR-010','MP-VEGETALES',400),('AGR-010','MP-ACEITE',30),('AGR-010','MP-SAL',12),
+('AGR-011','MP-PAPA',1500),('AGR-011','MP-ACEITE',40),('AGR-011','MP-ROMERO',8),('AGR-011','MP-SAL',12),
+('AGR-012','MP-ARROZ',1000),('AGR-012','MP-ACEITE',20),('AGR-012','MP-SAL',12),
+('AGR-013','MP-PASTA',1000),('AGR-013','MP-SALSA-TOMATE',800),('AGR-013','MP-CEBOLLA',100),('AGR-013','MP-AJO',2),('AGR-013','MP-ACEITE',20),
+('AGR-014','MP-PASTA',1000),('AGR-014','MP-ALBAHACA',200),('AGR-014','MP-QUESO',150),('AGR-014','MP-AJO',2),('AGR-014','MP-ACEITE',250),
+('ENS-010','MP-LECHUGA',600),('ENS-010','MP-PEPINO',300),('ENS-010','MP-ZANAHORIA',300),('ENS-010','MP-ACEITE',20),('ENS-010','MP-SAL',8),
+('ENS-011','MP-TOMATE',900),('ENS-011','MP-CEBOLLA',500),('ENS-011','MP-ACEITE',20),('ENS-011','MP-SAL',8),
+('POS-001','MP-CHOCOLATE',300),('POS-001','MP-CREMA',500),('POS-001','MP-AZUCAR',100),('POS-010','MP-FRUTA',1200),
+('EXT-010','MP-HARINA',1000),('EXT-010','MP-QUESO',600),('EXT-010','MP-ACEITE',100),('EXT-010','MP-SAL',20)
+) v(product_sku,ingredient_sku,quantity)
+JOIN products p ON p.sku=v.product_sku JOIN recipes r ON r.product_id=p.id JOIN ingredients i ON i.sku=v.ingredient_sku
+ON CONFLICT (recipe_id,ingredient_id) DO NOTHING;

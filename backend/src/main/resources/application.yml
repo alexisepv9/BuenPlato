@@ -1,5 +1,9 @@
 # Configuración común de Buen Plato API: nombre, perfil predeterminado y servicios compartidos.
 spring:
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   application:
     name: buen-plato-api
   profiles:

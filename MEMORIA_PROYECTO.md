@@ -1,5 +1,51 @@
 # Memoria del proyecto — Buen Plato
 
+Selector de fotos: `ProductPhotoEditor` usa React Dropzone con Tailwind y Font Awesome para selección accesible, arrastre, vista previa y reemplazo. Mantiene Axios multipart y almacenamiento local; no incorpora servicios externos ni cambia el MER. Se abre desde «Cambiar foto» en recetas. Priorizar componentes compartidos y bibliotecas adecuadas, conservando una paleta consistente.
+
+Fotos propias de platos disponibles en Ajustar preparación. POST multipart
+/api/products/{id}/photo (ADMIN), GET (ADMIN/CASHIER), storage/products/{id}.png.
+Validación JPG/PNG, 5 MB, 640×360 mínimo, 4096×4096 máximo; ideal 1280×720.
+La foto se guarda independientemente de la receta. No hay migración de esquema.
+
+Impresión interna: `printOrder.ts` genera comprobante cliente y comanda 80 mm
+desde GET /api/orders/{id} (ADMIN/CASHIER). No integra SII. Ventana independiente
+con selección manual de impresora; no confirma entrega física. Comandas sin precios,
+copias marcadas, versión visible si el pedido fue modificado. Prueba: node scripts/test-receipts.mjs.
+
+Edición completa: PUT /api/orders/{id}/content recibe sale y expectedRevision.
+Reutiliza cálculo de ventas, compensa movimientos históricos y guarda auditoría V6.
+Precios/recetas vigentes, sin integración de devolución bancaria. Notificaciones:
+GET /api/notifications filtra en servidor; ADMIN ve stock/ventas, CASHIER sus ventas.
+
+El historial expone la composición original `order_items.selections_json` junto
+con los importes guardados. Todas las rutas `/api/orders` requieren ADMIN o CASHIER.
+El resumen móvil se abre al incorporar productos o confirmar un buffet configurado.
+
+## Fotos de prueba en ventas
+
+Las tarjetas de menú, opciones y productos usan `DishImage`. La API autenticada
+`GET /api/images/demo/{name}` admite únicamente `food` y `fruit`; descarga las
+dos muestras de Picsum al necesitarlas y las conserva en `image-storage`.
+No sustituye las imágenes de materias primas ni ofrece carga de fotos reales.
+Cerrar sesión está disponible desde la cabecera compartida en todos los tamaños.
+
+## Regla de organización y comentarios
+
+El frontend se organiza en `features`, `components`, `types` y `lib`. No agregar
+pantallas de negocio dentro de `App.tsx`: éste coordina la aplicación. Cada módulo
+debe describir su responsabilidad en la cabecera; comentar decisiones y reglas
+no evidentes, evitando repetir literalmente el código. No registrar credenciales
+ni cuerpos de solicitudes/respuestas en la consola. Verificar compilación al
+extraer componentes y conservar los contratos del backend.
+
+## Regla permanente de documentación
+
+- Cada cambio funcional, visual, de navegación o de permisos debe revisar y actualizar `MANUAL_DE_USUARIO.md` en la misma entrega.
+- Cuando el cambio altere una pantalla o un recorrido visible, también deben renovarse las capturas afectadas en `docs/manual/imagenes/`.
+- Cada cambio de tablas, relaciones, claves, restricciones, migraciones o reglas de persistencia debe actualizar `MODELO_ENTIDAD_RELACION.md` en la misma entrega.
+- Las capturas deben validarse con Google Chrome en viewport móvil de 390 × 844 px y sin mostrar datos privados.
+- Ninguna tarea se considera terminada hasta comprobar que el manual y, cuando corresponda, el MER describen el comportamiento real.
+
 > Documento vivo. Debe actualizarse cuando cambie una decisión importante de
 > arquitectura, alcance, seguridad, datos o experiencia de usuario.
 
@@ -28,12 +74,14 @@ menús, precios, pedidos, ventas, usuarios e inventario.
 
 ### Inventario
 
-- Stock por producto o porción.
+- Stock real por materia prima en gramos, mililitros o unidades.
 - Umbral configurable de stock bajo.
 - Productos disponibles, con poco stock o agotados.
 - Movimientos por compra, venta, ajuste, devolución o merma.
 - Descuento automático de inventario al confirmar una venta.
 - Historial auditable de movimientos.
+- Todo alimento preparado requiere una receta antes de venderse. Solo la categoría `Bebestibles` descuenta stock directo por unidad.
+- Los seeders agregan datos demostrativos faltantes, pero nunca restauran stock ni sobrescriben recetas ajustadas por el administrador.
 
 ### Administración
 
@@ -290,3 +338,5 @@ React.
 | 2026-07-30 | Durante las implementaciones se explicará al usuario qué archivo, clase, función o configuración se está modificando y cómo participa en el flujo general. |
 | 2026-07-30 | Los archivos nuevos deben comenzar con una descripción breve de su responsabilidad; las clases y funciones principales deben documentar su propósito y las reglas de negocio no evidentes. |
 | 2026-07-30 | Los comentarios deben enseñar el porqué de la implementación y no repetir literalmente lo que ya expresa el código. |
+| 2026-09-10 | Todo producto preparado debe tener receta; una venta sin receta se bloquea. Solo `Bebestibles` usa inventario directo por unidad. |
+| 2026-09-10 | Los seeders de inventario y recetas son aditivos e idempotentes: no sobrescriben existencias, rendimientos ni componentes ajustados. |

@@ -45,13 +45,13 @@ public class FinanceService {
                 : Math.round(fixedExpenses / (grossMarginPercentage / 100.0));
 
         long inventoryValue = jdbc.queryForObject(
-                "SELECT COALESCE(SUM(stock * unit_cost), 0) FROM products WHERE active = TRUE AND track_stock = TRUE",
+                "SELECT COALESCE(SUM(stock * unit_cost), 0) FROM ingredients WHERE active = TRUE",
                 Long.class
         );
         long wasteCost = jdbc.queryForObject("""
-                SELECT COALESCE(SUM(ABS(im.quantity) * p.unit_cost), 0)
-                FROM inventory_movements im
-                JOIN products p ON p.id = im.product_id
+                SELECT COALESCE(SUM(ABS(im.quantity) * i.unit_cost), 0)
+                FROM ingredient_movements im
+                JOIN ingredients i ON i.id = im.ingredient_id
                 WHERE im.movement_type IN ('WASTE', 'LOSS')
                   AND CAST(im.created_at AS DATE) BETWEEN ? AND ?
                 """, Long.class, Date.valueOf(from), Date.valueOf(to));
@@ -147,8 +147,8 @@ public class FinanceService {
         List<ExpenseRow> expenseRows = expenses(from, to);
         List<StockRisk> stockRisks = jdbc.query("""
                 SELECT id, sku, name, stock, low_stock_threshold, stock * unit_cost inventory_value
-                FROM products
-                WHERE active = TRUE AND track_stock = TRUE AND stock <= low_stock_threshold
+                FROM ingredients
+                WHERE active = TRUE AND stock <= low_stock_threshold
                 ORDER BY stock ASC, name
                 """, (rs, row) -> new StockRisk(
                 rs.getLong("id"),

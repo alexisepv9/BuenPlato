@@ -12,6 +12,7 @@ RUN apk add --no-cache curl \
     && addgroup -S buenplato \
     && adduser -S buenplato -G buenplato
 WORKDIR /app
+RUN mkdir -p /app/storage && chown buenplato:buenplato /app/storage
 COPY --from=build /workspace/target/backend-*.jar /app/backend.jar
 USER buenplato
 EXPOSE 8080

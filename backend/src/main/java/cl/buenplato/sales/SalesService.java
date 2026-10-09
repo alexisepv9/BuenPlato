@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.PreparedStatement;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
@@ -55,7 +56,6 @@ public class SalesService {
                 JOIN categories c ON c.id = p.category_id
                 WHERE p.active = TRUE
                   AND c.active = TRUE
-                  AND (p.track_stock = FALSE OR p.stock > 0)
                 ORDER BY c.display_order, p.name
                 """, (rs, rowNum) -> new ProductSaleResponse(
                 rs.getLong("id"),
@@ -99,7 +99,7 @@ public class SalesService {
         int updated = jdbc.update("""
                 UPDATE orders
                 SET customer_name = ?, service_type = ?, status = ?,
-                    payment_method = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+                    payment_method = ?, notes = ?, revision = revision + 1, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
                 """, trimmed(request.customerName()), serviceType, status, paymentMethod, trimmed(request.notes()), id);
         if (updated == 0) {
@@ -108,7 +108,8 @@ public class SalesService {
         return findHistoryOrder(id);
     }
 
-    private OrderHistoryResponse findHistoryOrder(long id) {
+    @Transactional(readOnly = true)
+    public OrderHistoryResponse findHistoryOrder(long id) {
         OrderHistoryResponse order = jdbc.query("""
                         SELECT id, order_number, customer_name, service_type, status,
                                payment_method, payment_status, total, notes, created_at
@@ -131,23 +132,37 @@ public class SalesService {
         return order;
     }
 
+    /** Usa colecciones Java: evita exponer nodos Jackson 2 al serializador HTTP de Jackson 3. */
+    private List<Map<String, Object>> historySelections(String value) {
+        if (value == null || value.isBlank() || value.trim().equals("null")) return List.of();
+        try {
+            return objectMapper.readValue(value,
+                    new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, Object>>>() {});
+        } catch (com.fasterxml.jackson.core.JsonProcessingException exception) {
+            throw new IllegalStateException("Detalle histórico ilegible", exception);
+        }
+    }
+
     private OrderHistoryResponse historyOrder(
             long id, String number, String customer, String serviceType, String status,
             String paymentMethod, String paymentStatus, int total, String notes, String createdAt
     ) {
         List<OrderHistoryItem> items = jdbc.query("""
-                SELECT item_type, item_name, quantity, unit_price, total_price
+                SELECT menu_id, product_id, item_type, item_name, quantity, unit_price, total_price, selections_json
                 FROM order_items WHERE order_id = ? ORDER BY id
                 """, (rs, rowNum) -> new OrderHistoryItem(
+                rs.getObject("menu_id", Long.class), rs.getObject("product_id", Long.class),
                 rs.getString("item_type"),
                 rs.getString("item_name"),
                 rs.getInt("quantity"),
                 rs.getInt("unit_price"),
-                rs.getInt("total_price")
+                rs.getInt("total_price"),
+                historySelections(rs.getString("selections_json"))
         ), id);
         return new OrderHistoryResponse(
                 id, number, customer, serviceType, status, paymentMethod,
-                paymentStatus, total, notes, createdAt, items
+                paymentStatus, total, notes, createdAt, items,
+                jdbc.queryForObject("SELECT revision FROM orders WHERE id=?", Integer.class, id)
         );
     }
 
@@ -181,7 +196,6 @@ public class SalesService {
                 WHERE mo.menu_section_id = ?
                   AND mo.active = TRUE
                   AND p.active = TRUE
-                  AND (p.track_stock = FALSE OR p.stock > 0)
                 ORDER BY mo.extra_price, p.name
                 """, (rs, rowNum) -> new MenuOptionResponse(
                 rs.getLong("id"),
@@ -201,6 +215,42 @@ public class SalesService {
 
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest request, String createdByEmail) {
+        return persistOrder(request, createdByEmail, null);
+    }
+
+    /** Corrige la misma venta atómicamente y conserva su versión anterior. */
+    @Transactional
+    public OrderResponse replaceOrder(long id, ReplaceOrderRequest request, String actor) {
+        var revisions = jdbc.queryForList("SELECT revision FROM orders WHERE id=? FOR UPDATE", Integer.class, id);
+        if (revisions.isEmpty()) throw new IllegalArgumentException("La venta no existe.");
+        if (revisions.getFirst() != request.expectedRevision())
+            throw new IllegalArgumentException("Otra persona modificó esta venta. Recarga el historial antes de editar.");
+        jdbc.update("INSERT INTO order_revisions(order_id,previous_revision,snapshot_json,edited_by) VALUES (?,?,?,?)",
+                id, revisions.getFirst(), json(findHistoryOrder(id)), actor);
+        restoreOrderStock(id, "ingredients", "ingredient_movements", "ingredient_id");
+        restoreOrderStock(id, "products", "inventory_movements", "product_id");
+        return persistOrder(request.sale(), actor, id);
+    }
+
+    /** Devuelve el consumo neto original, no una receta que podría haber cambiado desde la venta. */
+    private void restoreOrderStock(long orderId, String table, String movements, String column) {
+        // Los identificadores provienen exclusivamente de las dos llamadas internas anteriores.
+        var balances = jdbc.queryForList("SELECT " + column + " AS entity_id, -SUM(quantity) AS amount FROM "
+                + movements + " WHERE order_id=? AND movement_type IN ('SALE','EDIT_RETURN') GROUP BY "
+                + column + " ORDER BY " + column, orderId);
+        for (var balance : balances) {
+            long entityId = ((Number) balance.get("entity_id")).longValue();
+            BigDecimal amount = (BigDecimal) balance.get("amount");
+            if (amount.signum() <= 0) continue;
+            BigDecimal previous = jdbc.queryForObject("SELECT stock FROM " + table + " WHERE id=? FOR UPDATE", BigDecimal.class, entityId);
+            jdbc.update("UPDATE " + table + " SET stock=stock+?,updated_at=CURRENT_TIMESTAMP WHERE id=?", amount, entityId);
+            jdbc.update("INSERT INTO " + movements + " (" + column
+                    + ",order_id,movement_type,quantity,previous_stock,resulting_stock,reason) VALUES (?,?,'EDIT_RETURN',?,?,?,?)",
+                    entityId, orderId, amount, previous, previous.add(amount), "Corrección de venta");
+        }
+    }
+
+    private OrderResponse persistOrder(CreateOrderRequest request, String createdByEmail, Long existingId) {
         List<MenuItemRequest> requestedMenus = request.menus() == null ? List.of() : request.menus();
         List<ExtraItem> requestedExtras = request.extras() == null ? List.of() : request.extras();
         if (requestedMenus.isEmpty() && requestedExtras.isEmpty()) {
@@ -238,8 +288,8 @@ public class SalesService {
 
         String orderNumber = "BP-" + OffsetDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
                 + "-" + UUID.randomUUID().toString().substring(0, 4).toUpperCase(Locale.ROOT);
-        String serviceType = normalized(request.serviceType(), "TAKEAWAY");
-        String paymentMethod = normalized(request.paymentMethod(), "CASH");
+        String serviceType = allowed(normalized(request.serviceType(), "TAKEAWAY"), Set.of("TAKEAWAY", "DINE_IN"), "tipo de servicio");
+        String paymentMethod = allowed(normalized(request.paymentMethod(), "CASH"), Set.of("CASH", "CARD", "TRANSFER"), "medio de pago");
         String customerName = trimmed(request.customerName());
         String notes = trimmed(request.notes());
         Long createdBy = createdByEmail == null ? null : jdbc.query("""
@@ -252,6 +302,15 @@ public class SalesService {
 
         KeyHolder orderKey = new GeneratedKeyHolder();
         int finalSubtotal = subtotal;
+        long orderId;
+        if (existingId != null) {
+            orderId = existingId;
+            orderNumber = jdbc.queryForObject("SELECT order_number FROM orders WHERE id=?", String.class, orderId);
+            jdbc.update("UPDATE orders SET customer_name=?,service_type=?,payment_method=?,subtotal=?,total=?,notes=?,revision=revision+1,updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                    customerName, serviceType, paymentMethod, subtotal, subtotal, notes, orderId);
+            jdbc.update("DELETE FROM order_items WHERE order_id=?", orderId);
+        } else {
+        final String newOrderNumber = orderNumber;
         jdbc.update(connection -> {
             PreparedStatement statement = connection.prepareStatement("""
                     INSERT INTO orders (
@@ -260,7 +319,7 @@ public class SalesService {
                         created_by, created_at, updated_at
                     ) VALUES (?, ?, 'POS', ?, 'PAID', ?, 'PAID', ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                     """, new String[]{"id"});
-            statement.setString(1, orderNumber);
+            statement.setString(1, newOrderNumber);
             statement.setString(2, customerName);
             statement.setString(3, serviceType);
             statement.setString(4, paymentMethod);
@@ -274,7 +333,8 @@ public class SalesService {
             }
             return statement;
         }, orderKey);
-        long orderId = Objects.requireNonNull(orderKey.getKey()).longValue();
+        orderId = Objects.requireNonNull(orderKey.getKey()).longValue();
+        }
 
         for (MenuSnapshot menuSnapshot : menuSnapshots) {
             jdbc.update("""
@@ -312,8 +372,7 @@ public class SalesService {
             );
         }
 
-        stockRequirements.forEach((productId, quantity) ->
-                discountStock(productId, quantity, orderId, orderNumber));
+        discountRequirements(stockRequirements, orderId, orderNumber, createdBy);
 
         return new OrderResponse(
                 orderId,
@@ -512,6 +571,93 @@ public class SalesService {
         );
     }
 
+    /**
+     * Convierte platos vendidos en consumo de materias primas. Los productos que
+     * aún no poseen receta conservan temporalmente el descuento directo anterior.
+     */
+    private void discountRequirements(
+            Map<Long, BigDecimal> productRequirements,
+            long orderId,
+            String orderNumber,
+            Long createdBy
+    ) {
+        Map<Long, BigDecimal> ingredientRequirements = new LinkedHashMap<>();
+        Map<Long, String> ingredientSources = new LinkedHashMap<>();
+        Map<Long, BigDecimal> legacyRequirements = new LinkedHashMap<>();
+
+        productRequirements.forEach((productId, portions) -> {
+            ProductPreparation preparation = jdbc.query("""
+                    SELECT p.name, c.slug, r.id AS recipe_id, r.yield_quantity
+                    FROM products p JOIN categories c ON c.id=p.category_id
+                    LEFT JOIN recipes r ON r.product_id=p.id AND r.active=TRUE
+                    WHERE p.id=? AND p.active=TRUE
+                    """, rs -> rs.next() ? new ProductPreparation(
+                    rs.getString("name"), rs.getString("slug"),
+                    rs.getObject("recipe_id", Long.class), rs.getBigDecimal("yield_quantity")) : null, productId);
+            if (preparation == null) throw new IllegalArgumentException("Un producto de la venta ya no está disponible.");
+            // Bebestibles llegan terminados desde el proveedor y se controlan por unidad.
+            if ("bebestibles".equals(preparation.categorySlug())) {
+                legacyRequirements.merge(productId, portions, BigDecimal::add);
+                return;
+            }
+            if (preparation.recipeId() == null) {
+                throw new IllegalArgumentException("El producto preparado " + preparation.productName()
+                        + " no tiene receta. Configúrala en Inventario antes de venderlo.");
+            }
+            jdbc.query("""
+                    SELECT ri.ingredient_id, ri.quantity
+                    FROM recipe_ingredients ri JOIN ingredients i ON i.id=ri.ingredient_id
+                    WHERE ri.recipe_id=? AND i.active=TRUE
+                    """, rs -> {
+                long ingredientId = rs.getLong("ingredient_id");
+                BigDecimal required = rs.getBigDecimal("quantity")
+                        .multiply(portions)
+                        .divide(preparation.yieldQuantity(), 3, RoundingMode.HALF_UP);
+                ingredientRequirements.merge(ingredientId, required, BigDecimal::add);
+                ingredientSources.merge(ingredientId, preparation.productName(), (left, right) -> left + ", " + right);
+            }, preparation.recipeId());
+        });
+
+        // Orden estable para reducir riesgo de interbloqueo entre ventas simultáneas.
+        ingredientRequirements.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .forEach(entry -> discountIngredient(
+                        entry.getKey(), entry.getValue(), orderId, orderNumber,
+                        ingredientSources.get(entry.getKey()), createdBy));
+        legacyRequirements.forEach((productId, quantity) ->
+                discountStock(productId, quantity, orderId, orderNumber));
+    }
+
+    private void discountIngredient(
+            long ingredientId,
+            BigDecimal quantity,
+            long orderId,
+            String orderNumber,
+            String source,
+            Long createdBy
+    ) {
+        IngredientStock stock = jdbc.query("""
+                SELECT name, base_unit, stock FROM ingredients
+                WHERE id=? AND active=TRUE FOR UPDATE
+                """, rs -> rs.next() ? new IngredientStock(
+                rs.getString("name"), rs.getString("base_unit"), rs.getBigDecimal("stock")) : null,
+                ingredientId);
+        if (stock == null) throw new IllegalArgumentException("Una materia prima de la receta ya no está disponible.");
+        if (stock.stock().compareTo(quantity) < 0) {
+            throw new IllegalArgumentException("Stock insuficiente de " + stock.name()
+                    + ": se necesitan " + quantity.stripTrailingZeros().toPlainString() + " " + stock.baseUnit().toLowerCase(Locale.ROOT) + ".");
+        }
+        BigDecimal resulting = stock.stock().subtract(quantity);
+        jdbc.update("UPDATE ingredients SET stock=?, updated_at=CURRENT_TIMESTAMP WHERE id=?", resulting, ingredientId);
+        jdbc.update("""
+                INSERT INTO ingredient_movements (
+                    ingredient_id, order_id, movement_type, quantity,
+                    previous_stock, resulting_stock, reason, created_by, created_at
+                ) VALUES (?, ?, 'SALE', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """, ingredientId, orderId, quantity.negate(), stock.stock(), resulting,
+                "Venta " + orderNumber + " · " + source, createdBy);
+    }
+
     private String json(Object value) {
         try {
             return objectMapper.writeValueAsString(value);
@@ -557,4 +703,6 @@ public class SalesService {
             int totalCost
     ) {}
     private record StockRow(String name, BigDecimal stock, boolean trackStock) {}
+    private record ProductPreparation(String productName, String categorySlug, Long recipeId, BigDecimal yieldQuantity) {}
+    private record IngredientStock(String name, String baseUnit, BigDecimal stock) {}
 }

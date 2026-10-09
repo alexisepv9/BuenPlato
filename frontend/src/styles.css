@@ -7,21 +7,31 @@
 @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap");
 @import "tailwindcss";
 
-@theme {
+:root {
+  --brand-primary: #b9472e;
+  --brand-secondary: #853951;
+  --brand-background: #fff8ef;
+  --brand-soft: #fbece5;
+  --brand-border: #eadfd4;
+  --brand-ink: #292b30;
+  --brand-muted: #697078;
+}
+
+@theme inline {
   --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
   /* Paleta estándar: un color cumple siempre la misma función. */
-  --color-brand: #d85d3d;
-  --color-brand-dark: #a94635;
-  --color-accent: #994353;
-  --color-cream: #fff8ef;
+  --color-brand: var(--brand-primary);
+  --color-brand-dark: var(--brand-secondary);
+  --color-accent: var(--brand-secondary);
+  --color-cream: var(--brand-background);
   --color-surface: #fffdf9;
-  --color-terracotta: #d85d3d;
+  --color-terracotta: var(--brand-primary);
   --color-saffron: #f2b544;
-  --color-berry: #994353;
+  --color-berry: var(--brand-secondary);
   --color-aqua: #4c93a6;
-  --color-charcoal: #332a2a;
-  --color-muted: #756c68;
-  --color-border: #eadfd4;
+  --color-charcoal: var(--brand-ink);
+  --color-muted: var(--brand-muted);
+  --color-border: var(--brand-border);
   --color-success: #6f8f54;
 }
 

@@ -1,7 +1,40 @@
 # Modelo entidad-relación — Buen Plato
 
+Fotos de producto: almacenamiento convencional `storage/products/{productId}.png`,
+una imagen por producto, servida por GET /api/products/{id}/photo. La relación usa
+el identificador existente; no hay nueva columna ni migración. POST en esa ruta
+reemplaza la foto (solo ADMIN). Respaldar el volumen image-storage junto con la BD.
+
+## V6: correcciones completas de ventas
+
+`orders.revision` aumenta con cada edición. `order_revisions` pertenece a una
+venta (`order_id`), conserva `previous_revision`, `snapshot_json`, `edited_by`
+y `created_at`. Relación: orders 1 → N order_revisions. Las líneas actuales se
+reemplazan dentro de la transacción sin cambiar el identificador ni fecha de venta.
+Los movimientos EDIT_RETURN compensan el consumo neto histórico antes de registrar
+el nuevo SALE. Una corrección fallida revierte todo. Las notificaciones se derivan
+de ventas y stock; sus marcas de lectura se guardan localmente por usuario.
+
+El historial de ventas consulta `order_items.selections_json` para presentar la
+composición histórica del buffet. No se modifica el esquema ni se necesita una
+migración: nombres, cantidades y recargos ya estaban guardados al confirmar la venta.
+
+Fotos demostrativas de ventas: archivos compartidos en `storage/demo-images`,
+persistidos mediante el volumen Docker `image-storage`. No se agregan columnas
+ni relaciones: son ilustraciones genéricas, no imágenes asignadas a cada producto.
+Se deben respaldar los volúmenes de imágenes y de PostgreSQL por separado.
+
+La migración `V5__ingredient_images.sql` agrega `ingredients.image_url`,
+VARCHAR(2048) nullable: enlace HTTPS opcional a la foto de la materia prima.
+No modifica relaciones, recetas ni existencias existentes.
+
 Este documento describe la estructura lógica inicial de la base de datos. El
 modelo está orientado a productos, menús configurables, ventas e inventario.
+
+> Documento vivo: debe actualizarse junto con cualquier cambio de tablas,
+> relaciones, claves, restricciones, migraciones o reglas de persistencia. Una
+> modificación de base de datos no se considera terminada hasta verificar que
+> este MER coincide con las migraciones Flyway y el comportamiento del backend.
 
 ## Diagrama MER
 
@@ -118,6 +151,42 @@ erDiagram
         timestamptz created_at
     }
 
+    INGREDIENTS {
+        bigint id PK
+        varchar sku UK
+        varchar name
+        varchar base_unit
+        numeric stock
+        numeric low_stock_threshold
+        numeric unit_cost
+        boolean active
+    }
+
+    RECIPES {
+        bigint id PK
+        bigint product_id FK,UK
+        numeric yield_quantity
+        boolean active
+    }
+
+    RECIPE_INGREDIENTS {
+        bigint recipe_id PK,FK
+        bigint ingredient_id PK,FK
+        numeric quantity
+    }
+
+    INGREDIENT_MOVEMENTS {
+        bigint id PK
+        bigint ingredient_id FK
+        bigint order_id FK
+        varchar movement_type
+        numeric quantity
+        numeric previous_stock
+        numeric resulting_stock
+        bigint created_by FK
+        timestamptz created_at
+    }
+
     EXPENSES {
         bigint id PK
         varchar reference_code UK
@@ -146,6 +215,12 @@ erDiagram
     ORDERS ||--o{ INVENTORY_MOVEMENTS : origina
     APP_USERS ||--o{ INVENTORY_MOVEMENTS : registra
     APP_USERS ||--o{ EXPENSES : registra
+    PRODUCTS ||--o| RECIPES : se_prepara_con
+    RECIPES ||--|{ RECIPE_INGREDIENTS : contiene
+    INGREDIENTS ||--o{ RECIPE_INGREDIENTS : participa
+    INGREDIENTS ||--o{ INGREDIENT_MOVEMENTS : genera
+    ORDERS ||--o{ INGREDIENT_MOVEMENTS : origina
+    APP_USERS ||--o{ INGREDIENT_MOVEMENTS : registra
 ```
 
 ## Lectura de las relaciones
@@ -232,6 +307,33 @@ Una venta puede contener ítems de tipo `MENU` y varios ítems de tipo `PRODUCT`
 Libro de movimientos del inventario. Registra compras, ventas, mermas, ajustes,
 devoluciones y sus existencias anterior y resultante.
 
+Esta tabla conserva temporalmente movimientos directos de productos antiguos
+sin receta. El inventario operativo nuevo utiliza `ingredient_movements`.
+
+### `ingredients`
+
+Representa materias primas, no platos preparados. El stock se normaliza en
+`G`, `ML` o `UNIT`; de ese modo 1 kg equivale a 1000 g y 1 litro a 1000 ml.
+
+### `recipes`
+
+Representa una preparación ajustable y solo puede ser mantenida por el administrador general. Todo producto alimenticio preparado debe relacionarse con una receta. Los productos de categoría `Bebestibles` son comprados listos para la venta, no llevan receta y controlan stock por unidad.
+
+El nombre comercial continúa perteneciendo a `products`; el formulario de preparación puede actualizarlo junto con el rendimiento.
+
+Asocia como máximo una receta activa a cada producto vendible. `yield_quantity`
+indica cuántas porciones produce el lote completo.
+
+### `recipe_ingredients`
+
+Define la cantidad de cada materia prima necesaria para producir el rendimiento
+de la receta. La clave compuesta impide repetir un ingrediente en el mismo plato.
+
+### `ingredient_movements`
+
+Audita cada entrada o salida de materia prima, incluyendo stock anterior,
+resultado, pedido, usuario y motivo.
+
 ### `expenses`
 
 Registra egresos fijos y variables del local. Junto con el costo histórico
@@ -270,6 +372,14 @@ frontend.
 15. Cada menú del pedido debe cumplir de forma independiente los mínimos y
     máximos definidos por sus secciones.
 16. Bebidas y productos extra no forman parte del precio base del menú.
+17. Las recetas se expresan por lote y deben tener rendimiento mayor que cero.
+18. Peso, volumen y unidades no pueden mezclarse; kg/l se convierten a g/ml.
+19. Una venta descuenta `cantidad_receta / rendimiento * porciones_vendidas`.
+20. Una materia prima utilizada en una receta no puede desactivarse.
+21. Todo producto activo cuya categoría no sea `Bebestibles` necesita una receta activa para venderse.
+22. Los productos de `Bebestibles` no llevan receta y descuentan `products.stock` por unidad vendida.
+23. Los seeders pueden completar ingredientes y recetas faltantes, pero no modificar stock ni preparaciones existentes.
+24. Eliminar una materia prima significa desactivarla; si participa en una receta, la operación se rechaza hasta modificar esa preparación.
 
 ## Estados propuestos
 
@@ -303,7 +413,6 @@ manejable:
 - `payments`: múltiples intentos o pagos parciales por pedido.
 - `order_item_selections`: selecciones normalizadas para análisis detallado.
 - `locations`: soporte para múltiples locales.
-- `recipes` y `ingredients`: inventario por ingrediente en lugar de porción.
 - `cash_sessions`: apertura, cierre y arqueo de caja.
 - `audit_log`: auditoría general de acciones administrativas.
 - `tax_documents`: boletas y documentos tributarios electrónicos.

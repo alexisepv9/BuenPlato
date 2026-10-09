@@ -25,6 +25,8 @@ services:
       - internal
 
   backend:
+    volumes:
+      - image-storage:/app/storage
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -34,7 +36,9 @@ services:
       DATABASE_URL: jdbc:postgresql://database:5432/${POSTGRES_DB:-buenplato}
       POSTGRES_USER: ${POSTGRES_USER:-buenplato}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Crea .env y define POSTGRES_PASSWORD}
-      APP_CORS_ALLOWED_ORIGIN_PATTERNS: ${APP_CORS_ALLOWED_ORIGIN_PATTERNS:-http://localhost,http://127.0.0.1}
+      # Permite la web local y las demostraciones HTTPS temporales creadas con
+      # Cloudflare Quick Tunnel, sin aceptar orígenes externos arbitrarios.
+      APP_CORS_ALLOWED_ORIGIN_PATTERNS: ${APP_CORS_ALLOWED_ORIGIN_PATTERNS:-http://localhost,http://127.0.0.1,https://*.trycloudflare.com}
       JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Xms128m -Xmx512m -XX:+UseSerialGC}
     depends_on:
       database:
@@ -73,4 +77,5 @@ networks:
     driver: bridge
 
 volumes:
+  image-storage:
   postgres-data:

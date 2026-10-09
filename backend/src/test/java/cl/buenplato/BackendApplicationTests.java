@@ -39,6 +39,7 @@ class BackendApplicationTests {
     @Autowired
     private JdbcTemplate jdbc;
 
+
     @Test
     void contextLoads() {
     }
@@ -100,6 +101,13 @@ class BackendApplicationTests {
                 category.getId(), "QA-VENTA", "Pollo de prueba", "", 3500, "porciones",
                 BigDecimal.TEN, BigDecimal.valueOf(2), true
         ));
+        // Todo alimento preparado necesita receta; esta prueba valida el descuento
+        // real de materia prima en lugar del stock heredado por porciones.
+        jdbc.update("INSERT INTO ingredients(sku,name,base_unit,stock,low_stock_threshold,unit_cost) VALUES ('QA-ING','Ingrediente QA','G',10,2,1)");
+        Long ingredientId = jdbc.queryForObject("SELECT id FROM ingredients WHERE sku='QA-ING'", Long.class);
+        jdbc.update("INSERT INTO recipes(product_id,yield_quantity) VALUES (?,1)", product.id());
+        Long recipeId = jdbc.queryForObject("SELECT id FROM recipes WHERE product_id=?", Long.class, product.id());
+        jdbc.update("INSERT INTO recipe_ingredients(recipe_id,ingredient_id,quantity) VALUES (?,?,1)", recipeId, ingredientId);
 
         jdbc.update("""
                 INSERT INTO menus (name, description, base_price, active, created_at)
@@ -147,11 +155,39 @@ class BackendApplicationTests {
         ));
 
         assertThat(order.total()).isEqualTo(13500);
-        assertThat(jdbc.queryForObject("SELECT stock FROM products WHERE id = ?", BigDecimal.class, product.id()))
-                .isEqualByComparingTo("8.00");
+        // El historial conserva la composición y precios originales, no el catálogo vigente.
+        var historical = salesService.orderHistory().stream()
+                .filter(sale -> sale.id().equals(order.id())).findFirst().orElseThrow();
+        assertThat(historical.items()).hasSize(1);
+        assertThat(historical.items().getFirst().selections().getFirst().get("name")).isEqualTo("Pollo de prueba");
+        assertThat(historical.items().getFirst().selections().getFirst().get("totalQuantity")).isEqualTo(2);
+        // Comprueba también el contrato JSON con el serializador HTTP de Spring Boot 4.
+        var httpMapper = new tools.jackson.databind.json.JsonMapper();
+        var responseJson = httpMapper.readTree(httpMapper.writeValueAsString(historical));
+        assertThat(responseJson.get("items").get(0).get("selections").isArray()).isTrue();
+        assertThat(responseJson.get("items").get(0).get("selections").get(0).get("name").asText())
+                .isEqualTo("Pollo de prueba");
+        assertThat(jdbc.queryForObject("SELECT stock FROM ingredients WHERE id = ?", BigDecimal.class, ingredientId))
+                .isEqualByComparingTo("8.000");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM order_items WHERE order_id = ?", Integer.class, order.id()))
                 .isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM inventory_movements WHERE order_id = ?", Integer.class, order.id()))
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ingredient_movements WHERE order_id = ?", Integer.class, order.id()))
                 .isEqualTo(1);
+        // Corregir usa el consumo histórico para devolver stock y la receta vigente para descontar.
+        jdbc.update("UPDATE recipe_ingredients SET quantity=3 WHERE recipe_id=?", recipeId);
+        var correction = new CreateOrderRequest(List.of(new MenuItemRequest(menuId, 1,
+                List.of(new SectionSelection(sectionId, List.of(new OptionQuantity(optionId, 1)))))),
+                List.of(), "Cliente corregido", "TAKEAWAY", "CARD", "Cambio de pedido");
+        var corrected = salesService.replaceOrder(order.id(), new cl.buenplato.sales.SalesDtos.ReplaceOrderRequest(correction, 0), "admin-test");
+        assertThat(corrected.id()).isEqualTo(order.id());
+        assertThat(corrected.orderNumber()).isEqualTo(order.orderNumber());
+        assertThat(corrected.total()).isEqualTo(7000);
+        assertThat(jdbc.queryForObject("SELECT stock FROM ingredients WHERE id=?", BigDecimal.class, ingredientId)).isEqualByComparingTo("7");
+        salesService.replaceOrder(order.id(), new cl.buenplato.sales.SalesDtos.ReplaceOrderRequest(correction, 1), "admin-test");
+        assertThat(jdbc.queryForObject("SELECT stock FROM ingredients WHERE id=?", BigDecimal.class, ingredientId)).isEqualByComparingTo("7");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM order_revisions WHERE order_id=?", Integer.class, order.id())).isEqualTo(2);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> salesService.replaceOrder(order.id(),
+                new cl.buenplato.sales.SalesDtos.ReplaceOrderRequest(correction, 0), "admin-test"))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Otra persona");
     }
 }

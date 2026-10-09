@@ -38,8 +38,20 @@ public class SalesController {
         return sales.orderHistory();
     }
 
+    /** Entrega el pedido persistido para impresión; nunca imprime un borrador de caja. */
+    @GetMapping("/orders/{id}")
+    OrderHistoryResponse orderDetail(@PathVariable long id) {
+        return sales.findHistoryOrder(id);
+    }
+
     @PutMapping("/orders/{id}")
     OrderHistoryResponse updateOrder(@PathVariable long id, @Valid @RequestBody UpdateOrderRequest request) {
         return sales.updateOrder(id, request);
+    }
+
+    @PutMapping("/orders/{id}/content")
+    OrderResponse replaceOrder(@PathVariable long id, @Valid @RequestBody SalesDtos.ReplaceOrderRequest request,
+                               Authentication authentication) {
+        return sales.replaceOrder(id, request, authentication.getName());
     }
 }

@@ -46,6 +46,8 @@ public class SecurityConfig {
                         auth.requestMatchers(PathRequest.toH2Console()).permitAll();
                     }
                     auth.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                            .requestMatchers(HttpMethod.GET, "/api/branding", "/api/branding/logo").permitAll()
+                            .requestMatchers("/api/branding", "/api/branding/**").hasRole("ADMIN")
                             .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
                             .requestMatchers(
                                     "/api/auth/login",
@@ -54,6 +56,18 @@ public class SecurityConfig {
                                     "/swagger-ui.html",
                                     "/v3/api-docs/**"
                             ).permitAll()
+                            // Administración de bodega, preparaciones y finanzas:
+                            // la regla vive en backend para que no pueda eludirse desde el navegador.
+                            .requestMatchers("/api/ingredients/**", "/api/recipes/**", "/api/finance/**")
+                            .hasRole("ADMIN")
+                            .requestMatchers(HttpMethod.PUT, "/api/products/*/recipe").hasRole("ADMIN")
+                            .requestMatchers(HttpMethod.POST, "/api/products/**").hasRole("ADMIN")
+                            .requestMatchers(HttpMethod.PUT, "/api/products/**").hasRole("ADMIN")
+                            .requestMatchers(HttpMethod.DELETE, "/api/products/**").hasRole("ADMIN")
+                            // Caja necesita leer productos y menús y operar ventas.
+                            .requestMatchers(HttpMethod.GET, "/api/categories/**", "/api/products/**", "/api/sales/**")
+                            .hasAnyRole("ADMIN", "CASHIER")
+                            .requestMatchers("/api/sales/**", "/api/orders", "/api/orders/**").hasAnyRole("ADMIN", "CASHIER")
                             .anyRequest().authenticated();
                 })
                 .formLogin(form -> form.disable())

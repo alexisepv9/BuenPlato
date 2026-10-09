@@ -21,11 +21,12 @@ export const apiClient = axios.create({
   timeout: 10_000,
   withCredentials: true,
   headers: {
-    "Content-Type": "application/json",
+    // Axios determina JSON o multipart según el cuerpo; no imponer JSON a los archivos.
     Accept: "application/json",
   },
 });
 
+/** Identifica una solicitud incluso en HTTP local, donde randomUUID puede faltar. */
 function createRequestId(): string {
   if (typeof globalThis.crypto?.getRandomValues === "function") {
     const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16));
@@ -49,7 +50,8 @@ apiClient.interceptors.request.use((config) => {
   if (import.meta.env.DEV) {
     console.info(
       `[API →] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`,
-      { requestId: trace.id, params: config.params, data: config.data },
+      // No registrar cuerpos ni parámetros: pueden contener claves o datos del cliente.
+      { requestId: trace.id },
     );
   }
   return config;
@@ -64,7 +66,6 @@ apiClient.interceptors.response.use(
         {
           requestId: response.headers["x-request-id"] ?? trace?.id,
           durationMs: trace ? Math.round(performance.now() - trace.startedAt) : undefined,
-          data: response.data,
         },
       );
     }
@@ -73,7 +74,7 @@ apiClient.interceptors.response.use(
   (error: unknown) => {
     if (axios.isAxiosError(error)) {
       const trace = error.config?.trace;
-      if (error.response?.status === 401 && error.config?.url !== "/auth/login") {
+      if (error.response?.status === 401 && !["/auth/login", "/auth/me"].includes(error.config?.url ?? "")) {
         window.dispatchEvent(new Event("buenplato:unauthorized"));
       }
       if (import.meta.env.DEV) {
@@ -84,7 +85,6 @@ apiClient.interceptors.response.use(
             durationMs: trace ? Math.round(performance.now() - trace.startedAt) : undefined,
             code: error.code,
             message: error.message,
-            response: error.response?.data,
           },
         );
       }
@@ -93,6 +93,7 @@ apiClient.interceptors.response.use(
   },
 );
 
+/** Convierte fallos de transporte o negocio en mensajes aptos para la interfaz. */
 export function apiErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
     const responseData = error.response?.data;
@@ -106,6 +107,9 @@ export function apiErrorMessage(error: unknown): string {
     }
     if (typeof responseData === "string" && responseData.trim()) {
       return responseData;
+    }
+    if (error.response?.status === 401) {
+      return "Tu sesión venció. Vuelve a iniciar sesión para continuar.";
     }
     if (error.code === "ECONNABORTED") {
       return "La API tardó demasiado en responder. Comprueba que el backend siga ejecutándose.";

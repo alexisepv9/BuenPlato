@@ -107,15 +107,19 @@ public final class SalesDtos {
             int total,
             String notes,
             String createdAt,
-            List<OrderHistoryItem> items
+            List<OrderHistoryItem> items,
+            int revision
     ) {}
 
     public record OrderHistoryItem(
+            Long menuId,
+            Long productId,
             String itemType,
             String itemName,
             int quantity,
             int unitPrice,
-            int totalPrice
+            int totalPrice,
+            List<java.util.Map<String, Object>> selections
     ) {}
 
     public record UpdateOrderRequest(
@@ -125,4 +129,7 @@ public final class SalesDtos {
             @NotBlank @Size(max = 30) String paymentMethod,
             @Size(max = 500) String notes
     ) {}
+
+    public record ReplaceOrderRequest(@jakarta.validation.constraints.NotNull @Valid CreateOrderRequest sale,
+                                      @Min(0) int expectedRevision) {}
 }
