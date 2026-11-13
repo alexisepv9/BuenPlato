@@ -7,7 +7,7 @@ import { BrandedLoader } from "./components/ui";
 import { LoginView } from "./features/auth/LoginView";
 import { AppShell } from "./components/AppShell";
 import { RawInventoryView } from "./features/inventory/RawInventoryView";
-import { NewProductView } from "./features/catalog/CatalogViews";
+import { ProductFormDialog } from "./features/catalog/ProductFormDialog";
 import { SalesView } from "./features/sales/SalesView";
 import { FinanceView } from "./features/finance/FinanceView";
 import { SettingsView } from "./features/settings/SettingsView";
@@ -92,13 +92,6 @@ export default function App() {
 
   useEffect(loadIngredients, [loadIngredients]);
 
-  function productCreated(product: Product) {
-    setSuccess(`${product.name} fue agregado correctamente al inventario.`);
-    setRefreshKey((value) => value + 1);
-    setView("products");
-    window.setTimeout(() => setSuccess(""), 5000);
-  }
-
   function inventoryChanged(message: string, refresh = true) {
     setSuccess(message);
     if (refresh) setRefreshKey((value) => value + 1);
@@ -165,7 +158,7 @@ export default function App() {
                 onChanged={inventoryChanged}
               />
             ) : (
-              <NewProductView categories={categories} onCancel={() => navigate("products")} onCreated={productCreated} />
+              <ProductFormDialog product={null} categories={categories} ingredients={ingredients} onClose={() => navigate("products")} onSaved={() => { navigate("products"); inventoryChanged("Producto guardado correctamente."); }} />
             )}
           </motion.div>
         </AnimatePresence>

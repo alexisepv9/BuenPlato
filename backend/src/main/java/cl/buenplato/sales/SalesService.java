@@ -587,22 +587,19 @@ public class SalesService {
 
         productRequirements.forEach((productId, portions) -> {
             ProductPreparation preparation = jdbc.query("""
-                    SELECT p.name, c.slug, r.id AS recipe_id, r.yield_quantity
+                    SELECT p.name, c.slug, p.track_stock, r.id AS recipe_id, r.yield_quantity
                     FROM products p JOIN categories c ON c.id=p.category_id
                     LEFT JOIN recipes r ON r.product_id=p.id AND r.active=TRUE
                     WHERE p.id=? AND p.active=TRUE
                     """, rs -> rs.next() ? new ProductPreparation(
                     rs.getString("name"), rs.getString("slug"),
-                    rs.getObject("recipe_id", Long.class), rs.getBigDecimal("yield_quantity")) : null, productId);
+                    rs.getObject("recipe_id", Long.class), rs.getBigDecimal("yield_quantity"), rs.getBoolean("track_stock")) : null, productId);
             if (preparation == null) throw new IllegalArgumentException("Un producto de la venta ya no está disponible.");
-            // Bebestibles llegan terminados desde el proveedor y se controlan por unidad.
-            if ("bebestibles".equals(preparation.categorySlug())) {
+            if (!preparation.trackStock()) return;
+            // Sin receta activa, cualquier categoría puede venderse descontando stock del producto.
+            if (preparation.recipeId() == null) {
                 legacyRequirements.merge(productId, portions, BigDecimal::add);
                 return;
-            }
-            if (preparation.recipeId() == null) {
-                throw new IllegalArgumentException("El producto preparado " + preparation.productName()
-                        + " no tiene receta. Configúrala en Inventario antes de venderlo.");
             }
             jdbc.query("""
                     SELECT ri.ingredient_id, ri.quantity
@@ -703,6 +700,6 @@ public class SalesService {
             int totalCost
     ) {}
     private record StockRow(String name, BigDecimal stock, boolean trackStock) {}
-    private record ProductPreparation(String productName, String categorySlug, Long recipeId, BigDecimal yieldQuantity) {}
+    private record ProductPreparation(String productName, String categorySlug, Long recipeId, BigDecimal yieldQuantity, boolean trackStock) {}
     private record IngredientStock(String name, String baseUnit, BigDecimal stock) {}
 }

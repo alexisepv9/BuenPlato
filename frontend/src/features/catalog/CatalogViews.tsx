@@ -1,4 +1,5 @@
 /** Formularios y componentes del catálogo de productos vendibles. */
+import { LocalPhotoField } from "../../components/LocalPhotoField";
 import type { FormEvent, ReactNode } from "react";
 import { useState } from "react";
 import { apiClient, apiErrorMessage } from "../../lib/api";
@@ -53,7 +54,7 @@ export function InventoryView({
       : "";
 
   return (
-    <div className="mx-auto max-w-[1380px]">
+    <div className="mx-auto max-w-[1000px]">
       <FloatingAlert message={success} tone="success" />
 
       <PageHeader
@@ -196,9 +197,8 @@ export function InventoryView({
 export function FilterButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button
-      className={`h-8 shrink-0 rounded-lg px-3 text-[10px] font-bold transition ${
-        active ? "bg-[var(--brand-secondary)] text-white" : "bg-[#f4eee4] text-[#69756e] hover:bg-[#fff0d5] hover:text-[#ad4c32]"
-      }`}
+      className={`h-8 shrink-0 rounded-lg px-3 text-[10px] font-bold transition ${active ? "bg-[var(--brand-secondary)] text-white" : "bg-[#f4eee4] text-[#69756e] hover:bg-[#fff0d5] hover:text-[#ad4c32]"
+        }`}
       onClick={onClick}
     >
       {children}
@@ -334,6 +334,7 @@ export function EditProductDialog({
   onClose: () => void;
   onSaved: (product: Product) => void;
 }) {
+  const [photo, setPhoto] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -353,6 +354,11 @@ export function EditProductDialog({
         lowStockThreshold: Number(data.get("lowStockThreshold")),
         trackStock: data.get("trackStock") === "on",
       });
+      if (photo) {
+        const file = new FormData(); file.append("file", photo);
+        try { await apiClient.post(`/products/${product.id}/photo`, file); }
+        catch (failure) { throw new Error(`Los datos se guardaron, pero la foto no: ${apiErrorMessage(failure)}. Reintenta sin crear otro producto.`); }
+      }
       onSaved(updated);
     } catch (error) {
       setMessage(apiErrorMessage(error));
@@ -375,6 +381,8 @@ export function EditProductDialog({
         </header>
 
         <div className="grid gap-4 p-5 sm:grid-cols-2">
+          <div className="px-5"><LocalPhotoField label="Foto del producto" file={photo} onChange={setPhoto} currentUrl={`/api/products/${product.id}/photo`} disabled={saving} /></div>
+
           <Field label="Nombre" className="sm:col-span-2">
             <input className={fieldClass} name="name" required maxLength={120} defaultValue={product.name} />
           </Field>
@@ -480,6 +488,8 @@ export function NewProductView({
   onCancel: () => void;
   onCreated: (product: Product) => void;
 }) {
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [pendingProduct, setPendingProduct] = useState<Product | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [trackStock, setTrackStock] = useState(true);
@@ -498,16 +508,24 @@ export function NewProductView({
     setSaving(true);
     const data = new FormData(event.currentTarget);
     try {
-      const { data: created } = await apiClient.post<Product>("/products", {
-        categoryId: Number(selectedCategory),
-        name: String(data.get("name") ?? "").trim(),
-        description: String(data.get("description") ?? "").trim(),
-        price: Number(data.get("price")),
-        unit: data.get("unit"),
-        stock: Number(data.get("stock")),
-        lowStockThreshold: Number(data.get("lowStockThreshold")),
-        trackStock,
+      const { data: created } = await apiClient.request<Product>({
+        method: pendingProduct ? "put" : "post", url: pendingProduct ? `/products/${pendingProduct.id}` : "/products", data: {
+          categoryId: Number(selectedCategory),
+          name: String(data.get("name") ?? "").trim(),
+          description: String(data.get("description") ?? "").trim(),
+          price: Number(data.get("price")),
+          unit: data.get("unit"),
+          stock: Number(data.get("stock")),
+          lowStockThreshold: Number(data.get("lowStockThreshold")),
+          trackStock,
+        }
       });
+      setPendingProduct(created);
+      if (photo) {
+        const file = new FormData(); file.append("file", photo);
+        try { await apiClient.post(`/products/${created.id}/photo`, file); }
+        catch (failure) { throw new Error(`El producto se guardó, pero la foto no: ${apiErrorMessage(failure)}. Puedes reintentar aquí sin duplicarlo.`); }
+      }
       onCreated(created);
     } catch (error) {
       setMessage(apiErrorMessage(error));
@@ -532,6 +550,7 @@ export function NewProductView({
 
       <form className="mt-7 grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]" onSubmit={submit}>
         <div className="space-y-5">
+          <LocalPhotoField label="Foto del producto" file={photo} onChange={setPhoto} disabled={saving} />
           <FormSection number="01" title="Información básica" subtitle="Datos visibles en inventario, ventas y reportes.">
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="Nombre del producto" className="md:col-span-2">
@@ -580,11 +599,10 @@ export function NewProductView({
                     type="button"
                     key={category.id}
                     onClick={() => setSelectedCategory(String(category.id))}
-                    className={`relative flex min-h-24 flex-col items-start justify-between rounded-xl border p-3 text-left transition ${
-                      active
-                        ? "border-[var(--brand-secondary)] bg-[#edf2ee] text-[#294334] ring-2 ring-[var(--brand-secondary)]/10"
-                        : "border-[var(--brand-border)] bg-white text-[#6b7670] hover:border-[#aeb7b1]"
-                    }`}
+                    className={`relative flex min-h-24 flex-col items-start justify-between rounded-xl border p-3 text-left transition ${active
+                      ? "border-[var(--brand-secondary)] bg-[#edf2ee] text-[#294334] ring-2 ring-[var(--brand-secondary)]/10"
+                      : "border-[var(--brand-border)] bg-white text-[#6b7670] hover:border-[#aeb7b1]"
+                      }`}
                   >
                     <Icon name={icons[category.slug] ?? "box"} className={active ? "text-[var(--brand-secondary)]" : "text-[#9aa39e]"} />
                     <span className="text-[11px] font-bold">{category.name}</span>

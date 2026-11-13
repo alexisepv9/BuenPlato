@@ -353,6 +353,10 @@ React.
 
 ## Categorías de insumos y retiro de SKU — 13/11/2026
 
+### Catálogo genérico — formulario compartido
+
+`ProductFormDialog` es el formulario activo de alta/edición en Productos. La vista muestra una lista uniforme con fotos cuadradas, filtro y búsqueda; elimina la separación entre recetas y venta directa. `ProductConfigurationController` guarda datos/composición atómicamente y admite PRODUCT, COMPOSITION o NONE. Los modos se representan mediante `track_stock` y la existencia de composición activa, sin columna nueva. Se mantienen seeders y migraciones para no reemplazar stock o decisiones del usuario. Ventas no deduce la política de la categoría y respeta sin control incluso si una composición antigua permaneciera activa. Se prueban cambios de modo y descuento por producto/insumos/sin descuento. La foto sigue siendo una operación separada con manejo explícito de fallo parcial.
+
 En **Insumos → Categorías**, el administrador puede crear, renombrar y desactivar categorías sin agregar opciones al menú lateral. Para desactivar una categoría utilizada, seleccione otra como destino: los insumos se reasignan juntos, sin cambiar sus existencias. La categoría inicial no puede desactivarse. En el formulario de insumo se selecciona la categoría y en el listado se puede filtrar por ella.
 
 La migración V9 elimina las columnas SKU; conserva IDs, recetas, ventas y stock. Las migraciones históricas no se modifican y pueden mencionar SKU. Antes de actualizar una instalación existente, respalde la base. Los seeders modificados no reinsertan productos o ingredientes si ese seeder ya se ejecutó anteriormente; las instalaciones nuevas reciben los datos demo. Verificado con pruebas H2; la actualización de una base PostgreSQL existente requiere validación adicional.

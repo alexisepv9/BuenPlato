@@ -31,5 +31,10 @@ class RecipePersistenceTests {
         var updated = inventory.saveRecipe(product,new RecipeRequest("Plato QA editado",new BigDecimal("8"),components));
         assertThat(updated.id()).isEqualTo(created.id());
         assertThat(updated.yieldQuantity()).isEqualByComparingTo("8");
+        inventory.saveRecipe(product,new RecipeRequest("Plato QA editado",BigDecimal.ONE,List.of()));
+        assertThat(jdbc.queryForObject("SELECT active FROM recipes WHERE id=?",Boolean.class,created.id())).isFalse();
+        assertThat(inventory.listRecipes()).noneMatch(recipe -> recipe.productId() == product);
+        var restored = inventory.saveRecipe(product,new RecipeRequest("Plato QA editado",BigDecimal.ONE,components));
+        assertThat(restored.id()).isEqualTo(created.id());
     }
 }

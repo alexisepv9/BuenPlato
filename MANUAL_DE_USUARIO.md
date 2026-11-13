@@ -437,7 +437,41 @@ La terminología coincide con las pantallas actuales y los límites relevantes e
 
 ## Categorías de insumos y retiro de SKU — 13/11/2026
 
+### Productos genéricos: formulario único de alta y edición
+
+**Eliminar producto:** pulse Eliminar en su tarjeta y confirme el nombre con **Sí, eliminar**. Cancelar o Escape cierran sin cambios mientras no se esté enviando la solicitud. Es una baja lógica: conserva ventas e insumos, pero retira el producto del catálogo y de nuevas ventas. Si falla la API, la ventana muestra el error y permite reintentar. Requiere permisos de administrador.
+
+**Listado compacto:** las fotos mantienen su proporción cuadrada, con tarjetas más pequeñas. En celular se muestran dos columnas; en pantallas mayores la cantidad de columnas se adapta al espacio disponible. El botón **Editar** permanece al pie de cada tarjeta y conserva un área táctil de al menos 44 px de alto.
+
+**Selector de ingredientes simplificado:** cada fila muestra el insumo con su unidad fija (g, mL o unidades), la cantidad y la papelera. Ya no hay un selector separado de unidad. La papelera quita el ingrediente de este producto, no elimina el insumo de la bodega; confirme con **Guardar producto**. Sin ingredientes, la venta descuenta solo las existencias del producto cuando su control de stock está activo; no descuenta insumos. Los productos previamente configurados sin control conservan esa excepción. Esta indicación sustituye la selección g/kg y mL/L descrita en versiones anteriores.
+
+**Interfaz vigente — ingredientes opcionales sin selector de modo:** el formulario ya no muestra «Modo de venta y control de stock». Pulse **Agregar ingrediente** para abrir una fila con insumo, cantidad y unidad. Los insumos de peso admiten g/kg, los de volumen mL/L y los de conteo unidades. Cambiar g a kg o mL a L convierte la cantidad para conservar el mismo consumo; cambiar de insumo reinicia la cantidad a 1 en su unidad base. Puede quitar filas. Si no agrega ingredientes, un producto nuevo descuenta su propio stock; los productos antiguos sin control conservan esa configuración. Con ingredientes, se descuentan los insumos proporcionalmente a las unidades obtenidas indicadas (1 por defecto). Por ejemplo, 1 kg para 4 unidades descuenta 250 g por unidad vendida. Stock, precio y aviso del producto permanecen visibles. Esta interfaz sustituye las instrucciones anteriores sobre elegir un modo con un selector.
+
+**Unidad de venta:** seleccione una opción agrupada por conteo, alimentos/porciones, envases/presentaciones, peso, volumen, longitud/superficie o servicios/tiempo. Ejemplos: unidades, porciones, botellas, cajas, kilogramos, litros, metros o servicios. Una unidad antigua que no esté en el catálogo aparece en **Unidad actual**, sin alterarse al abrir el formulario. El precio, stock y umbral deben expresarse en la unidad elegida: una caja cuenta como una caja, no como sus artículos internos. Cambiar la unidad no convierte cantidades ni precios. Las unidades de insumos de una composición se mantienen independientes. Seleccionar una unidad de peso o tiempo no añade por sí solo venta fraccionada ni funciones de agenda.
+
+**Ajuste de presentación:** crear y editar usan una sola columna, también en escritorio. La fotografía tiene un espacio cuadrado de tamaño fijo para que no deforme los campos. Nombre, categoría, precio, unidad, descripción, stock actual y **Avisar cuando queden** permanecen visibles. El selector **Modo de venta y control de stock** permite elegir producto sin ingredientes, producto con ingredientes o sin control. Solo la opción con ingredientes muestra los componentes y el rendimiento. En ese modo, los descuentos y alertas corresponden a los insumos; los valores de stock/aviso del producto se conservan para venta directa. En modo sin control, esos valores se guardan pero no generan descuentos. Cambiar el selector no borra las cantidades escritas en stock y alerta.
+
+En **Productos**, todos los artículos se muestran juntos con foto cuadrada, nombre, categoría, precio y política de inventario. Puede buscar por nombre o filtrar por categoría. Ya no se separan platos pendientes ni se exige que un producto sea comida.
+
+**Nuevo producto** y **Editar producto** abren el mismo formulario. Complete nombre, categoría, descripción opcional, precio, unidad de venta y fotografía del dispositivo. En **Control de inventario** elija:
+
+- **Por existencias del producto:** indique stock actual y alerta; cada venta descuenta la cantidad vendida. Ejemplo: botella o paquete de galletas.
+- **Por composición de insumos:** indique las unidades obtenidas y los insumos con sus cantidades, en g, mL o unidades según cada insumo. Se exige al menos un componente y no se permite repetirlo. Ejemplo: una cazuela, un jugo preparado o un kit.
+- **Sin control de existencias:** las ventas no descuentan stock ni insumos.
+
+La categoría solo organiza: no determina el control de inventario. Al cambiar a existencias o sin control se desactiva la composición anterior, sin borrar ventas históricas. El cambio no transforma insumos en existencias ni repone cantidades automáticamente. Datos comerciales y composición se guardan juntos; la fotografía se sube después. Si falla la foto, el mensaje indica que el producto ya está guardado y permite reintentar sin duplicarlo. Cancelar después de ese aviso no deshace el guardado.
+
+Esta actualización requiere reiniciar el backend y recargar el frontend. No necesita migración ni resembrado: conserva productos, IDs, cantidades y categorías existentes. Los términos técnicos `recipes` y `recipe_ingredients` se mantienen en la base para representar la composición opcional.
+
 ### Error al guardar una preparación
+
+### Fotos locales en productos y preparaciones
+
+La vista previa muestra primero el archivo seleccionado, después la foto propia guardada. En productos existentes sin foto propia puede mostrar la misma imagen de ejemplo local del catálogo, identificada como **Foto de ejemplo local**. Si tampoco puede cargarla, indica **Sin foto disponible**; si falla un archivo recién seleccionado, informa el error sin sustituirlo por una foto de ejemplo. Seleccionar un archivo no lo guarda hasta confirmar el formulario.
+
+**Ingredientes opcionales:** ya no existe el aviso «platos pendientes de receta». Un producto sin receta activa es de venta directa y descuenta su propio stock cuando tiene control de existencias activado. Agregar ingredientes permite descontar insumos según el rendimiento de la receta. Para volver a venta directa, quite todos los ingredientes y guarde: se desactiva la receta, sin borrar el historial. Revise las existencias del producto antes de venderlo; quitar ingredientes no repone stock automáticamente. Los productos sin receta continúan visibles en Productos.
+
+Los formularios de alta y edición de productos, y el formulario de preparación, permiten **Seleccionar foto del dispositivo** o arrastrar un JPG/PNG. Se utiliza el mismo selector de Insumos, con vista previa cuadrada sin recortar el archivo. Se recomienda 800 × 800 px; máximo 5 MB y límites aceptados de 640 × 360 a 4096 × 4096 px. No se solicita un enlace externo. Al confirmar, se guardan los datos y luego la imagen en el almacenamiento del servidor. Si solo falla la imagen, el formulario informa que los datos ya fueron guardados y permite reintentar sin crear otro producto. Cerrar o cancelar no revierte datos que ya se hubieran guardado.
 
 Se corrigió un fallo al asociar por primera vez una receta a un producto: podía responder 500 aunque los datos fueran válidos. La corrección requiere reiniciar el backend para cargar el código actualizado. Si ocurre un 500 al editar nombre, precio o foto, conserve el mensaje de la terminal del backend y señale el campo modificado: ese código por sí solo no identifica la causa. No cree otro producto para intentar resolverlo.
 

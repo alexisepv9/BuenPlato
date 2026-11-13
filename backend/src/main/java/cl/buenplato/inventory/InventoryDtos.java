@@ -33,7 +33,7 @@ public final class InventoryDtos {
     public record RecipeRequest(
             @NotBlank @Size(max = 120) String productName,
             @NotNull @Positive BigDecimal yieldQuantity,
-            @NotEmpty List<@Valid RecipeComponentRequest> ingredients
+            @NotNull List<@Valid RecipeComponentRequest> ingredients
     ) {}
 
     public record RecipeComponentResponse(

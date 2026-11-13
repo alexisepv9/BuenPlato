@@ -3,7 +3,8 @@ import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { apiClient, apiErrorMessage } from "../../lib/api";
 import { DishImage } from "../../components/DishImage";
-import { ProductPhotoEditor } from "../../components/ProductPhotoEditor";
+import { DeleteProductModal } from "../catalog/DeleteProductModal";
+import { ProductFormDialog } from "../catalog/ProductFormDialog";
 import { IngredientCategoriesDialog } from "./IngredientCategoriesDialog";
 import { IngredientQuantityFields } from "./IngredientQuantityFields";
 import { LocalPhotoField } from "../../components/LocalPhotoField";
@@ -51,6 +52,11 @@ export function RawInventoryView({ section, ingredients, products, categories, l
   onStatus: (value: InventoryStatusFilter) => void;
   onChanged: (message: string, refresh?: boolean) => void;
 }) {
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [productEditor, setProductEditor] = useState<Product | "new" | null>(null);
+  const [productFilter, setProductFilter] = useState("");
+  const [productSearch, setProductSearch] = useState("");
+  const [compositionLoading, setCompositionLoading] = useState(false);
   const [photoRevision, setPhotoRevision] = useState(0);
   const [ingredientCategories, setIngredientCategories] = useState<{ id: number; name: string }[]>([]);
   const [categoryFilter, setCategoryFilter] = useState("");
@@ -71,8 +77,6 @@ export function RawInventoryView({ section, ingredients, products, categories, l
     } catch (error) { setActionError(apiErrorMessage(error)); }
     finally { setCreatingCategory(false); }
   }
-  // La fotografía se guarda por separado: no mezcla sus acciones con la receta.
-  const [photoRecipe, setPhotoRecipe] = useState<Recipe | null>(null);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [editing, setEditing] = useState<Ingredient | null | "new">(null);
   const [ingredientPhoto, setIngredientPhoto] = useState<File | null>(null);
@@ -81,19 +85,18 @@ export function RawInventoryView({ section, ingredients, products, categories, l
   useEffect(() => { setIngredientPhoto(null); }, [editing]);
   const [deleting, setDeleting] = useState<Ingredient | null>(null);
   const [actionError, setActionError] = useState("");
-  const [editingRecipe, setEditingRecipe] = useState<Recipe | "new" | null>(null);
-  const [pendingRecipeProduct, setPendingRecipeProduct] = useState<Product | null>(null);
-  const [recipeComponents, setRecipeComponents] = useState<{ ingredientId: number; quantity: number }[]>([]);
   const low = ingredients.filter((item) => item.stockStatus === "LOW_STOCK").length;
   const out = ingredients.filter((item) => item.stockStatus === "OUT_OF_STOCK").length;
   const value = ingredients.reduce((sum, item) => sum + item.stock * item.unitCost, 0);
   const visible = ingredients.filter(item => (!statusFilter || item.stockStatus === statusFilter)
     && (!categoryFilter || item.categoryId === Number(categoryFilter))
     && item.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
-  const preparedWithoutRecipe = products.filter((product) => product.category.slug !== "bebestibles" && !recipes.some((recipe) => recipe.productId === product.id));
 
   useEffect(() => {
-    if (section === "recipes") apiClient.get<Recipe[]>("/recipes").then(({ data }) => setRecipes(data)).catch(error => setActionError(apiErrorMessage(error)));
+    if (section === "recipes") {
+      setCompositionLoading(true);
+      apiClient.get<Recipe[]>("/recipes").then(({ data }) => setRecipes(data)).catch(error => setActionError(apiErrorMessage(error))).finally(() => setCompositionLoading(false));
+    }
   }, [section]);
 
   async function saveIngredient(event: FormEvent<HTMLFormElement>) {
@@ -144,47 +147,17 @@ export function RawInventoryView({ section, ingredients, products, categories, l
     }
   }
 
-  function openRecipe(recipe: Recipe | "new", pendingProduct: Product | null = null) {
-    setEditingRecipe(recipe);
-    setPendingRecipeProduct(pendingProduct);
-    setRecipeComponents(recipe === "new" ? [{ ingredientId: ingredients[0]?.id ?? 0, quantity: 1 }] : recipe.ingredients.map((item) => ({ ingredientId: item.ingredientId, quantity: item.quantity })));
-  }
-
-  async function saveRecipe(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const productName = String(form.get("productName") ?? "").trim();
-    const payload = { productName, yieldQuantity: Number(form.get("yieldQuantity")), ingredients: recipeComponents.map((item) => ({ ...item, unit: ingredients.find((ingredient) => ingredient.id === item.ingredientId)?.baseUnit ?? "G" })) };
-    try {
-      let createdNewProduct = false;
-      let productId = editingRecipe === "new" ? pendingRecipeProduct?.id : editingRecipe?.productId;
-      // Una preparación nueva crea primero su producto vendible; el usuario nunca
-      // necesita conocer ni seleccionar identificadores internos del catálogo.
-      if (!productId) {
-        const { data: createdProduct } = await apiClient.post<Product>("/products", {
-          categoryId: Number(form.get("categoryId")),
-          name: productName, description: "Preparación elaborada en el local.",
-          price: Number(form.get("price")), unit: "PORCION", stock: 0,
-          lowStockThreshold: 0, trackStock: true,
-        });
-        productId = createdProduct.id;
-        createdNewProduct = true;
-      }
-      await apiClient.put(`/products/${productId}/recipe`, payload);
-      setEditingRecipe(null);
-      setPendingRecipeProduct(null);
-      const { data } = await apiClient.get<Recipe[]>("/recipes");
-      setRecipes(data);
-      onChanged("La preparación y su rendimiento fueron guardados.", createdNewProduct);
-    } catch (requestError) { setActionError(apiErrorMessage(requestError)); }
-  }
-
-
   return <div className="mx-auto max-w-[1380px]">
     {showCategories && <IngredientCategoriesDialog categories={ingredientCategories} onClose={() => setShowCategories(false)} onChanged={items => { setIngredientCategories(items); setCategoryFilter(""); onChanged("Categorías actualizadas."); }} />}
     <FloatingAlert message={success} tone="success" />
     <FloatingAlert message={actionError} />
-    <PageHeader eyebrow="Bodega y producción" title={section === "ingredients" ? "Insumos" : "Productos"} description={section === "ingredients" ? "Revisa existencias, actualiza cantidades y configura las alertas de tus ingredientes." : "Define los ingredientes y porciones de cada plato. Gestiona su fotografía por separado."} icon="wheat-awn" actions={<div className="flex flex-wrap gap-2">{section === "ingredients" && <button type="button" onClick={() => setShowCategories(true)} className="h-11 rounded-xl border border-white/50 px-4 text-sm font-semibold"><Icon name="tags" className="mr-2" />Categorías</button>}<button className="h-11 rounded-xl bg-[var(--brand-primary)] px-4 text-xs font-extrabold text-white" onClick={() => section === "ingredients" ? setEditing("new") : openRecipe("new")}><Icon name="plus" className="mr-2" />{section === "ingredients" ? "Nueva materia prima" : "Nueva preparación"}</button></div>} />
+    {productToDelete && <DeleteProductModal product={productToDelete} onClose={() => setProductToDelete(null)} onDeleted={() => {
+      const name = productToDelete.name;
+      setRecipes(items => items.filter(item => item.productId !== productToDelete.id));
+      setProductToDelete(null);
+      onChanged(`${name} fue eliminado del catálogo.`, true);
+    }} />}
+    <PageHeader eyebrow="Bodega y producción" title={section === "ingredients" ? "Insumos" : "Productos"} description={section === "ingredients" ? "Revisa existencias, actualiza cantidades y configura las alertas de tus ingredientes." : "Administra productos, precios, fotografías y su forma de controlar inventario."} icon="wheat-awn" actions={<div className="flex flex-wrap gap-2">{section === "ingredients" && <button type="button" onClick={() => setShowCategories(true)} className="h-11 rounded-xl border border-white/50 px-4 text-sm font-semibold"><Icon name="tags" className="mr-2" />Categorías</button>}<button className="h-11 rounded-xl bg-[var(--brand-primary)] px-4 text-xs font-extrabold text-white" onClick={() => section === "ingredients" ? setEditing("new") : setProductEditor("new")}><Icon name="plus" className="mr-2" />{section === "ingredients" ? "Nueva materia prima" : "Nuevo producto"}</button></div>} />
     {section === "ingredients" ? <>
       <section className="mt-5 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <MetricCard icon="wheat-awn" label="Materias primas" value={ingredients.length} helper="Ingredientes activos" tone="green" active={!statusFilter} onClick={() => onStatus("")} />
@@ -202,48 +175,37 @@ export function RawInventoryView({ section, ingredients, products, categories, l
           <div className="mt-4 flex flex-wrap gap-2 border-t border-[var(--brand-border)] pt-4"><button onClick={() => setEditing(item)} className="min-h-11 flex-1 rounded-xl bg-[var(--brand-soft)] px-3 text-xs font-bold"><Icon name="pen" className="mr-2" />Editar datos y stock</button><button onClick={() => setDeleting(item)} className="min-h-11 rounded-xl px-3 text-xs font-bold text-[#b9472e] hover:bg-[#fde9e4]" aria-label={`Retirar ${item.name}`}><Icon name="trash" className="mr-2" />Retirar</button></div>
         </article>)}</div>}
       </section>
-    </> : <><div className="mt-5 flex items-center justify-between gap-3"><p className="text-[10px] font-bold text-[var(--brand-muted)]">{preparedWithoutRecipe.length ? `${preparedWithoutRecipe.length} platos pendientes de receta` : "Todos los platos preparados están inventariados"}</p></div>{preparedWithoutRecipe.length > 0 && <section className="mt-3 grid gap-3 md:grid-cols-2">{preparedWithoutRecipe.map((product) => <button key={product.id} onClick={() => openRecipe("new", product)} className="rounded-2xl border border-[#f0cfa7] bg-[#fff7e8] p-4 text-left"><span className="text-[9px] font-extrabold uppercase text-[#b16b17]">Receta pendiente</span><strong className="mt-1 block text-sm">{product.name}</strong><small className="text-[#817467]">No puede venderse hasta configurar sus ingredientes.</small><span className="mt-3 block text-xs font-extrabold text-[#b16b17]"><Icon name="plus" className="mr-2" />Completar receta</span></button>)}</section>}<section className="mt-3 grid gap-4 lg:grid-cols-2">{recipes.map((recipe) => <article key={recipe.id} className="rounded-[24px] border border-[var(--brand-border)] bg-white p-5 shadow-sm">
-      {/* Misma fuente local que las opciones del punto de venta; no consulta proveedores externos. */}
-      <DishImage key={`${recipe.productId}-${photoRevision}`} productId={recipe.productId} name={recipe.productName} source={`/api/images/demo/${products.find(product => product.id === recipe.productId)?.category.slug === "postres" ? "fruit" : "food"}`} />
-      <span className="text-[9px] font-extrabold uppercase tracking-wider text-[var(--brand-primary)]">Receta de producción</span><h2 className="mt-1 text-lg font-extrabold">{recipe.productName}</h2>
-      <div className="mt-3 flex gap-2 text-[10px]"><span className="rounded-lg bg-[var(--brand-soft)] px-2 py-1">Rinde {recipe.yieldQuantity} porciones</span><span className="rounded-lg bg-[#edf5eb] px-2 py-1">Costo {currency.format(recipe.costPerPortion)} / porción</span></div>
-      <div className="mt-4 space-y-2">{recipe.ingredients.map((component) => <div key={component.ingredientId} className="flex justify-between border-b border-[#f0ebe3] py-2 text-xs"><span>{component.ingredientName}</span><strong>{readableQuantity(component.quantity, component.baseUnit)}</strong></div>)}</div>
-      <div className="mt-4 flex flex-wrap gap-2 border-t border-[var(--brand-border)] pt-4">
-        <button onClick={() => openRecipe(recipe)} className="min-h-11 flex-1 rounded-xl bg-[var(--brand-soft)] px-3 text-xs font-bold"><Icon name="pen" className="mr-2" />Editar receta</button>
-        <button onClick={() => setPhotoRecipe(recipe)} className="min-h-11 rounded-xl border border-[var(--brand-border)] px-4 text-xs font-bold"><Icon name="camera" className="mr-2" />Cambiar foto</button>
-      </div>
-    </article>)}</section></>}
+    </> : <section className="mt-5">
+      <div className="mb-4 grid gap-3 sm:grid-cols-2"><input aria-label="Buscar productos" className={fieldClass} type="search" value={productSearch} onChange={e => setProductSearch(e.target.value)} placeholder="Buscar producto por nombre" /><select aria-label="Filtrar productos por categoría" className={fieldClass} value={productFilter} onChange={e => setProductFilter(e.target.value)}><option value="">Todas las categorías</option>{categories.map(c => <option key={c.id} value={c.slug}>{c.name}</option>)}</select></div>
+      {/* Columnas según el espacio real disponible, incluyendo el ancho ocupado por el menú lateral. */}
+      {loading || compositionLoading ? <BrandedLoader label="Cargando productos" /> : error ? <p role="alert">{error}</p> : <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(180px,1fr))] sm:gap-3">{products.filter(p => (!productFilter || p.category.slug === productFilter) && p.name.toLocaleLowerCase().includes(productSearch.toLocaleLowerCase())).map(product => {
+        const composition = recipes.find(r => r.productId === product.id);
+        return <article key={product.id} className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-white p-2.5 sm:p-3">
+          <DishImage key={`${product.id}-${photoRevision}`} square productId={product.id} name={product.name} source="/api/images/demo/food" />
+          <p className="break-words text-[11px] font-semibold text-brand">{product.category.name}</p><h2 className="mt-1 break-words text-sm font-semibold leading-5">{product.name}</h2><p className="mt-1.5 text-base font-semibold">{currency.format(product.price)}</p>
+          <p className="mt-1.5 mb-3 break-words text-xs text-muted">{!product.trackStock ? "Sin control de existencias" : composition ? `Por insumos · ${composition.ingredients.length} componentes` : `Existencias: ${product.stock} ${product.unit}`}</p>
+          <div className="mt-auto flex flex-wrap gap-1.5"><button onClick={() => setProductEditor(product)} aria-label={`Editar ${product.name}`} className="min-h-11 flex-1 rounded-xl bg-cream px-2 text-xs font-semibold"><Icon name="pen" className="mr-1.5" />Editar</button><button onClick={() => setProductToDelete(product)} aria-label={`Eliminar ${product.name}`} className="min-h-11 flex-1 rounded-xl border border-red-100 px-2 text-xs font-semibold text-red-700">Eliminar</button></div>
+        </article>;
+      })}</div>}
+      {!loading && !compositionLoading && !products.length && <p className="p-5 text-center text-muted">Todavía no hay productos.</p>}
+    </section>}
     {editing && <div className="fixed inset-0 z-50 grid place-items-end bg-black/35 sm:place-items-center sm:p-5"><form aria-busy={savingIngredient} onSubmit={saveIngredient} className="max-h-[90dvh] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl">
       <div className="flex justify-between"><div><span className="text-[9px] font-bold uppercase text-[var(--brand-primary)]">Bodega</span><h2 className="text-lg font-extrabold">{editing === "new" ? "Nueva materia prima" : "Editar materia prima"}</h2></div><button type="button" onClick={() => setEditing(null)}><Icon name="xmark" /></button></div>
       <div className="mt-5 grid gap-3 sm:grid-cols-2"><Field label="Nombre"><input className={fieldClass} name="name" required defaultValue={editing === "new" ? "" : editing.name} /></Field>
-      <Field label="Categoría"><select className={fieldClass} name="categoryId" required defaultValue={editing === "new" ? "" : editing.categoryId}><option value="">Seleccionar categoría</option>{ingredientCategories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}</select></Field>
-      <div className="sm:col-span-2"><label className="text-xs text-muted" htmlFor="new-ingredient-category">¿Falta una categoría? Créala aquí y luego selecciónala.</label><div className="mt-2 flex gap-2"><input id="new-ingredient-category" className={fieldClass} value={newCategory} maxLength={80} placeholder="Nombre de nueva categoría" onChange={event => setNewCategory(event.target.value)} /><button type="button" disabled={creatingCategory || !newCategory.trim()} onClick={() => void createCategory()} className="shrink-0 rounded-xl border border-border px-3 text-sm disabled:opacity-40">{creatingCategory ? "Creando…" : "Crear categoría"}</button></div></div>
-      <IngredientQuantityFields key={editing === "new" ? "new" : editing.id} ingredient={editing === "new" ? null : editing} /></div>
+        <Field label="Categoría"><select className={fieldClass} name="categoryId" required defaultValue={editing === "new" ? "" : editing.categoryId}><option value="">Seleccionar categoría</option>{ingredientCategories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}</select></Field>
+        <div className="sm:col-span-2"><label className="text-xs text-muted" htmlFor="new-ingredient-category">¿Falta una categoría? Créala aquí y luego selecciónala.</label><div className="mt-2 flex gap-2"><input id="new-ingredient-category" className={fieldClass} value={newCategory} maxLength={80} placeholder="Nombre de nueva categoría" onChange={event => setNewCategory(event.target.value)} /><button type="button" disabled={creatingCategory || !newCategory.trim()} onClick={() => void createCategory()} className="shrink-0 rounded-xl border border-border px-3 text-sm disabled:opacity-40">{creatingCategory ? "Creando…" : "Crear categoría"}</button></div></div>
+        <IngredientQuantityFields key={editing === "new" ? "new" : editing.id} ingredient={editing === "new" ? null : editing} /></div>
       {editing !== "new" && <p className="mt-3 rounded-xl bg-[#fff6e7] px-3 py-2 text-[10px] leading-4 text-[#80633d]"><Icon name="circle-info" className="mr-2" />Modifica la existencia actual y confirma con el botón inferior. La cantidad ingresada reemplaza el stock actual. Puedes cambiar entre L y mL, o entre kg y g; no entre volumen y peso.</p>}
       <LocalPhotoField file={ingredientPhoto} onChange={setIngredientPhoto} currentUrl={editing === "new" ? null : editing.imageUrl} disabled={savingIngredient} />
       <p className="mt-2 text-xs text-muted">La foto se guarda en el servidor al confirmar. No necesitas un enlace.</p>
       <div className="sticky bottom-0 mt-5 flex gap-3 border-t border-[var(--brand-border)] bg-white py-3"><button type="button" onClick={() => setEditing(null)} className="h-12 rounded-xl border border-[var(--brand-border)] px-5 text-xs font-bold">Cancelar</button><button disabled={savingIngredient} className="h-12 flex-1 rounded-xl bg-brand text-sm font-semibold text-white disabled:opacity-50">{savingIngredient ? "Guardando…" : editing === "new" ? "Crear insumo" : "Guardar cambios"}</button></div>
     </form></div>}
     {deleting && <div className="fixed inset-0 z-[55] grid place-items-end bg-black/40 sm:place-items-center sm:p-5"><div role="dialog" aria-modal="true" className="w-full max-w-md rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl"><div className="grid size-11 place-items-center rounded-2xl bg-[#fde9e4] text-[#b9472e]"><Icon name="trash" /></div><h2 className="mt-4 text-lg font-extrabold">¿Retirar {deleting.name}?</h2><p className="mt-2 text-xs leading-5 text-[#737d77]">Dejará de aparecer en el inventario. Su historial se conservará. Si está incluida en una receta, primero tendrás que modificar esa preparación.</p><div className="mt-5 grid grid-cols-2 gap-2"><button type="button" onClick={() => setDeleting(null)} className="h-11 rounded-xl border border-[#dedbd5] text-xs font-bold">Cancelar</button><button type="button" onClick={deleteIngredient} className="h-11 rounded-xl bg-[#c94c30] text-xs font-extrabold text-white">Sí, retirar</button></div></div></div>}
-    {editingRecipe && <div className="fixed inset-0 z-50 grid place-items-end bg-black/40 sm:place-items-center sm:p-5"><form onSubmit={saveRecipe} className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-white p-5 sm:rounded-3xl">
-      <div className="flex justify-between"><div><span className="text-[9px] font-bold uppercase text-[var(--brand-primary)]">Producción</span><h2 className="text-lg font-extrabold">{editingRecipe === "new" ? "Nueva preparación" : `Ajustar ${editingRecipe.productName}`}</h2></div><button type="button" onClick={() => { setEditingRecipe(null); setPendingRecipeProduct(null); }}><Icon name="xmark" /></button></div>
-      {editingRecipe === "new" && <p className="mt-3 text-xs text-muted">Primero guarda la receta. Después utiliza «Cambiar foto» en la tarjeta del plato.</p>}
-      <div className="mt-5 grid gap-3 sm:grid-cols-2">
-        <Field label="Nombre de la preparación"><input className={fieldClass} name="productName" required placeholder="Ej.: Puré de papas casero" defaultValue={editingRecipe === "new" ? pendingRecipeProduct?.name ?? "" : editingRecipe.productName} readOnly={Boolean(pendingRecipeProduct)} /></Field>
-        {editingRecipe === "new" && !pendingRecipeProduct && <><Field label="Categoría de venta"><select className={fieldClass} name="categoryId" required defaultValue=""><option value="">Seleccionar categoría</option>{categories.filter((category) => category.slug !== "bebestibles").map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></Field><Field label="Precio de venta por porción"><input className={fieldClass} name="price" type="number" min="0" step="1" required defaultValue={0} /></Field></>}
-        <Field label="Porciones que rinde esta receta"><input className={fieldClass} name="yieldQuantity" type="number" min="0.001" step="0.001" required defaultValue={editingRecipe === "new" ? 1 : editingRecipe.yieldQuantity} /></Field>
-      </div>
-      <div className="mt-5 space-y-3">{recipeComponents.map((component, index) => <div key={index} className="grid grid-cols-[1fr_110px_36px] gap-2"><select className={fieldClass} value={component.ingredientId} onChange={(event) => setRecipeComponents((items) => items.map((item, position) => position === index ? { ...item, ingredientId: Number(event.target.value) } : item))}>{ingredients.map((ingredient) => <option key={ingredient.id} value={ingredient.id}>{ingredient.name} ({ingredient.baseUnit.toLowerCase()})</option>)}</select><input className={fieldClass} type="number" min="0.001" step="0.001" value={component.quantity} onChange={(event) => setRecipeComponents((items) => items.map((item, position) => position === index ? { ...item, quantity: Number(event.target.value) } : item))} /><button type="button" aria-label="Quitar ingrediente" onClick={() => setRecipeComponents((items) => items.filter((_, position) => position !== index))}><Icon name="trash" /></button></div>)}</div>
-      <button type="button" onClick={() => setRecipeComponents((items) => [...items, { ingredientId: ingredients[0]?.id ?? 0, quantity: 1 }])} className="mt-3 h-9 rounded-xl bg-[var(--brand-soft)] px-3 text-[10px] font-bold"><Icon name="plus" className="mr-2" />Agregar ingrediente</button>
-      <div className="sticky bottom-0 mt-5 flex gap-3 border-t border-[var(--brand-border)] bg-white py-3">
-        <button type="button" onClick={() => { setEditingRecipe(null); setPendingRecipeProduct(null); }} className="h-12 rounded-xl border border-[var(--brand-border)] px-5 text-xs font-bold">Cancelar</button>
-        <button disabled={!recipeComponents.length} className="h-12 flex-1 rounded-xl bg-[var(--brand-primary)] text-xs font-extrabold text-white disabled:opacity-40">Guardar receta</button>
-      </div>
-    </form></div>}
-    {photoRecipe && <div className="fixed inset-0 z-[60] grid place-items-center bg-black/40 p-4"><section role="dialog" aria-modal="true" aria-label={`Foto de ${photoRecipe.productName}`} className="max-h-[90dvh] w-full max-w-xl overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl">
-      <div className="flex items-start justify-between gap-4"><div><p className="text-xs font-bold text-[var(--brand-primary)]">Fotografía del plato</p><h2 className="text-lg font-extrabold">{photoRecipe.productName}</h2></div><button className="size-11 rounded-xl bg-[var(--brand-soft)]" aria-label="Cerrar fotografía" onClick={() => setPhotoRecipe(null)}><Icon name="xmark" /></button></div>
-      <ProductPhotoEditor key={photoRecipe.productId} productId={photoRecipe.productId} onSaved={() => { setPhotoRevision(value => value + 1); setPhotoRecipe(null); onChanged("La fotografía del plato fue actualizada."); }} />
-      <button onClick={() => setPhotoRecipe(null)} className="mt-4 h-11 w-full rounded-xl border border-[var(--brand-border)] text-xs font-bold">Volver a recetas</button>
-    </section></div>}
+    {productEditor && <ProductFormDialog product={productEditor === "new" ? null : productEditor} composition={productEditor === "new" ? undefined : recipes.find(r => r.productId === productEditor.id)} categories={categories} ingredients={ingredients} onClose={() => { setProductEditor(null); onChanged("", true); }} onSaved={() => {
+      setProductEditor(null); setPhotoRevision(value => value + 1);
+      setCompositionLoading(true);
+      apiClient.get<Recipe[]>("/recipes").then(({ data }) => setRecipes(data)).catch(error => setActionError(apiErrorMessage(error))).finally(() => setCompositionLoading(false));
+      onChanged("Producto guardado correctamente.", true);
+    }} />}
   </div>;
 }

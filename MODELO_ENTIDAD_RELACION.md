@@ -426,6 +426,10 @@ Sin cambio de tablas: `ingredients.image_url` referencia `/api/ingredients/{id}/
 
 ## Categorías de insumos y retiro de SKU — 13/11/2026
 
+### Producto genérico y composición opcional
+
+No cambia el esquema: `products` representa cualquier artículo vendible; `recipes` y `recipe_ingredients` representan una composición opcional, no una obligación culinaria. Con `track_stock=false` no se descuenta inventario. Con `track_stock=true` y composición activa se descuentan insumos según cantidades/rendimiento; sin composición activa se descuenta `products.stock`. La categoría no decide este comportamiento. POST `/api/products/configuration` y PUT `/api/products/configuration/{id}` guardan datos y composición en una transacción. Las fotografías conservan su endpoint multipart independiente. No se modifica ninguna migración histórica ni se reejecutan seeders para convertir datos.
+
 En **Insumos → Categorías**, el administrador puede crear, renombrar y desactivar categorías sin agregar opciones al menú lateral. Para desactivar una categoría utilizada, seleccione otra como destino: los insumos se reasignan juntos, sin cambiar sus existencias. La categoría inicial no puede desactivarse. En el formulario de insumo se selecciona la categoría y en el listado se puede filtrar por ella.
 
 La migración V9 elimina las columnas SKU; conserva IDs, recetas, ventas y stock. Las migraciones históricas no se modifican y pueden mencionar SKU. Antes de actualizar una instalación existente, respalde la base. Los seeders modificados no reinsertan productos o ingredientes si ese seeder ya se ejecutó anteriormente; las instalaciones nuevas reciben los datos demo. Verificado con pruebas H2; la actualización de una base PostgreSQL existente requiere validación adicional.

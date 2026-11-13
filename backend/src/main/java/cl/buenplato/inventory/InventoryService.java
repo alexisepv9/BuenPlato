@@ -108,6 +108,12 @@ public class InventoryService {
             throw new IllegalArgumentException("Una materia prima no puede repetirse en la receta.");
         }
         Long recipeId = jdbc.query("SELECT id FROM recipes WHERE product_id=?", rs -> rs.next() ? rs.getLong(1) : null, productId);
+        // Una lista vacía significa venta directa: conservar la receta histórica, pero desactivarla.
+        if (request.ingredients().isEmpty()) {
+            if (recipeId != null) jdbc.update("UPDATE recipes SET active=FALSE, updated_at=CURRENT_TIMESTAMP WHERE id=?", recipeId);
+            return new RecipeResponse(recipeId == null ? 0 : recipeId, productId, productName,
+                    request.yieldQuantity(), BigDecimal.ZERO, List.of());
+        }
         if (recipeId == null) {
             var key = new GeneratedKeyHolder();
             jdbc.update(connection -> {
