@@ -52,7 +52,6 @@ class BackendApplicationTests {
         );
         var created = catalogService.createProduct(new ProductCreateRequest(
                 category.getId(),
-                "QA-TRANSACCIONAL",
                 "Producto de validación",
                 "Este registro nunca queda persistido.",
                 2500,
@@ -74,12 +73,12 @@ class BackendApplicationTests {
                 new Category("Agregados", "agregados-edicion-test", "COMPONENT", 2)
         );
         var created = catalogService.createProduct(new ProductCreateRequest(
-                category.getId(), "QA-EDITAR", "Arroz", "", 1200, "porciones",
+                category.getId(), "Arroz", "", 1200, "porciones",
                 BigDecimal.TEN, BigDecimal.valueOf(3), true
         ));
 
         var updated = catalogService.updateProduct(created.id(), new ProductUpdateRequest(
-                category.getId(), "QA-EDITAR", "Arroz integral", "Actualizado", 1500, "porciones",
+                category.getId(), "Arroz integral", "Actualizado", 1500, "porciones",
                 BigDecimal.valueOf(2), BigDecimal.valueOf(4), true
         ));
         assertThat(updated.name()).isEqualTo("Arroz integral");
@@ -98,13 +97,13 @@ class BackendApplicationTests {
                 new Category("Proteína venta", "proteina-venta-test", "COMPONENT", 1)
         );
         var product = catalogService.createProduct(new ProductCreateRequest(
-                category.getId(), "QA-VENTA", "Pollo de prueba", "", 3500, "porciones",
+                category.getId(), "Pollo de prueba", "", 3500, "porciones",
                 BigDecimal.TEN, BigDecimal.valueOf(2), true
         ));
         // Todo alimento preparado necesita receta; esta prueba valida el descuento
         // real de materia prima en lugar del stock heredado por porciones.
-        jdbc.update("INSERT INTO ingredients(sku,name,base_unit,stock,low_stock_threshold,unit_cost) VALUES ('QA-ING','Ingrediente QA','G',10,2,1)");
-        Long ingredientId = jdbc.queryForObject("SELECT id FROM ingredients WHERE sku='QA-ING'", Long.class);
+        jdbc.update("INSERT INTO ingredients(name,base_unit,stock,low_stock_threshold,unit_cost) VALUES ('Ingrediente QA','G',10,2,1)");
+        Long ingredientId = jdbc.queryForObject("SELECT id FROM ingredients WHERE name='Ingrediente QA'", Long.class);
         jdbc.update("INSERT INTO recipes(product_id,yield_quantity) VALUES (?,1)", product.id());
         Long recipeId = jdbc.queryForObject("SELECT id FROM recipes WHERE product_id=?", Long.class, product.id());
         jdbc.update("INSERT INTO recipe_ingredients(recipe_id,ingredient_id,quantity) VALUES (?,?,1)", recipeId, ingredientId);

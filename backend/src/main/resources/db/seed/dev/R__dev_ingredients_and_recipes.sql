@@ -1,37 +1,37 @@
 -- Catálogo culinario de desarrollo. Inserta faltantes sin sobrescribir ajustes del administrador.
-INSERT INTO ingredients (sku,name,base_unit,stock,low_stock_threshold,unit_cost,active)
-SELECT v.sku,v.name,v.unit,v.stock,v.threshold,v.cost,TRUE FROM (VALUES
-('MP-CARNE','Carne de vacuno','G',10000,2000,8.5000),('MP-POLLO','Pechuga de pollo','G',10000,2000,5.5000),('MP-SALMON','Salmón','G',5000,1000,12.0000),
-('MP-SAL','Sal','G',1000,200,0.8000),('MP-ZANAHORIA','Zanahoria','G',5000,1000,1.2000),('MP-CEBOLLA','Cebolla','G',5000,1000,1.1000),
-('MP-AJO','Ajo','UNIT',100,20,120.0000),('MP-ARROZ','Arroz','G',10000,2000,1.6000),('MP-ACEITE','Aceite vegetal','ML',5000,1000,2.2000),
-('MP-VEGETALES','Vegetales mixtos','G',8000,1500,2.5000),('MP-PAPA','Papa','G',12000,2500,1.3000),('MP-ROMERO','Romero','G',300,50,8.0000),
-('MP-LECHUGA','Lechuga','G',4000,800,2.2000),('MP-PEPINO','Pepino','G',4000,800,1.8000),('MP-TOMATE','Tomate','G',8000,1500,2.0000),
-('MP-CHOCOLATE','Chocolate','G',3000,500,8.0000),('MP-CREMA','Crema','ML',4000,800,3.0000),('MP-AZUCAR','Azúcar','G',4000,800,1.1000),
-('MP-FRUTA','Fruta de estación','G',8000,1500,2.2000),('MP-HARINA','Harina','G',10000,2000,1.0000),('MP-QUESO','Queso','G',5000,1000,5.5000),
-('MP-PASTA','Tallarines secos','G',10000,2000,1.8000),('MP-SALSA-TOMATE','Salsa de tomate','G',6000,1200,2.3000),('MP-ALBAHACA','Albahaca','G',1000,200,9.0000)
-) v(sku,name,unit,stock,threshold,cost) WHERE NOT EXISTS (SELECT 1 FROM ingredients i WHERE i.sku=v.sku);
+INSERT INTO ingredients (name,base_unit,stock,low_stock_threshold,unit_cost,active)
+SELECT v.name,v.unit,v.stock,v.threshold,v.cost,TRUE FROM (VALUES
+('Carne de vacuno','G',10000,2000,8.5000),('Pechuga de pollo','G',10000,2000,5.5000),('Salmón','G',5000,1000,12.0000),
+('Sal','G',1000,200,0.8000),('Zanahoria','G',5000,1000,1.2000),('Cebolla','G',5000,1000,1.1000),
+('Ajo','UNIT',100,20,120.0000),('Arroz','G',10000,2000,1.6000),('Aceite vegetal','ML',5000,1000,2.2000),
+('Vegetales mixtos','G',8000,1500,2.5000),('Papa','G',12000,2500,1.3000),('Romero','G',300,50,8.0000),
+('Lechuga','G',4000,800,2.2000),('Pepino','G',4000,800,1.8000),('Tomate','G',8000,1500,2.0000),
+('Chocolate','G',3000,500,8.0000),('Crema','ML',4000,800,3.0000),('Azúcar','G',4000,800,1.1000),
+('Fruta de estación','G',8000,1500,2.2000),('Harina','G',10000,2000,1.0000),('Queso','G',5000,1000,5.5000),
+('Tallarines secos','G',10000,2000,1.8000),('Salsa de tomate','G',6000,1200,2.3000),('Albahaca','G',1000,200,9.0000)
+) v(name,unit,stock,threshold,cost) WHERE NOT EXISTS (SELECT 1 FROM ingredients existing WHERE existing.name=v.name) AND NOT EXISTS (SELECT 1 FROM flyway_schema_history WHERE script='R__dev_ingredients_and_recipes.sql' AND success=TRUE);
 
 INSERT INTO recipes(product_id,yield_quantity,active)
 SELECT p.id,v.yield_quantity,TRUE FROM (VALUES
-('PRO-001',4),('PRO-010',4),('PRO-011',4),('AGR-001',4),('AGR-010',8),('AGR-011',6),('AGR-012',8),('AGR-013',8),('AGR-014',8),
-('ENS-010',6),('ENS-011',6),('POS-001',6),('POS-010',6),('EXT-010',12)
-) v(sku,yield_quantity) JOIN products p ON p.sku=v.sku WHERE NOT EXISTS (SELECT 1 FROM recipes r WHERE r.product_id=p.id);
+('Salmón premium',4),('Pollo grillado',4),('Carne mechada',4),('Vegetales rostizados',4),('Arroz primavera',8),('Papas rústicas',6),('Arroz blanco',8),('Tallarines con salsa roja',8),('Tallarines con salsa verde',8),
+('Ensalada fresca',6),('Ensalada chilena',6),('Mousse de chocolate',6),('Fruta de estación',6),('Empanada de queso',12)
+) v(name,yield_quantity) JOIN products p ON p.name=v.name WHERE NOT EXISTS (SELECT 1 FROM recipes r WHERE r.product_id=p.id);
 
 INSERT INTO recipe_ingredients(recipe_id,ingredient_id,quantity)
 SELECT r.id,i.id,v.quantity FROM (VALUES
-('PRO-001','MP-SALMON',800),('PRO-001','MP-SAL',12),('PRO-001','MP-ACEITE',20),
-('PRO-010','MP-POLLO',800),('PRO-010','MP-SAL',12),('PRO-010','MP-ACEITE',20),('PRO-010','MP-AJO',2),
-('PRO-011','MP-CARNE',1000),('PRO-011','MP-SAL',6),('PRO-011','MP-ZANAHORIA',100),('PRO-011','MP-CEBOLLA',100),('PRO-011','MP-AJO',2),
-('AGR-001','MP-VEGETALES',1000),('AGR-001','MP-ACEITE',30),('AGR-001','MP-SAL',8),
-('AGR-010','MP-ARROZ',1000),('AGR-010','MP-VEGETALES',400),('AGR-010','MP-ACEITE',30),('AGR-010','MP-SAL',12),
-('AGR-011','MP-PAPA',1500),('AGR-011','MP-ACEITE',40),('AGR-011','MP-ROMERO',8),('AGR-011','MP-SAL',12),
-('AGR-012','MP-ARROZ',1000),('AGR-012','MP-ACEITE',20),('AGR-012','MP-SAL',12),
-('AGR-013','MP-PASTA',1000),('AGR-013','MP-SALSA-TOMATE',800),('AGR-013','MP-CEBOLLA',100),('AGR-013','MP-AJO',2),('AGR-013','MP-ACEITE',20),
-('AGR-014','MP-PASTA',1000),('AGR-014','MP-ALBAHACA',200),('AGR-014','MP-QUESO',150),('AGR-014','MP-AJO',2),('AGR-014','MP-ACEITE',250),
-('ENS-010','MP-LECHUGA',600),('ENS-010','MP-PEPINO',300),('ENS-010','MP-ZANAHORIA',300),('ENS-010','MP-ACEITE',20),('ENS-010','MP-SAL',8),
-('ENS-011','MP-TOMATE',900),('ENS-011','MP-CEBOLLA',500),('ENS-011','MP-ACEITE',20),('ENS-011','MP-SAL',8),
-('POS-001','MP-CHOCOLATE',300),('POS-001','MP-CREMA',500),('POS-001','MP-AZUCAR',100),('POS-010','MP-FRUTA',1200),
-('EXT-010','MP-HARINA',1000),('EXT-010','MP-QUESO',600),('EXT-010','MP-ACEITE',100),('EXT-010','MP-SAL',20)
-) v(product_sku,ingredient_sku,quantity)
-JOIN products p ON p.sku=v.product_sku JOIN recipes r ON r.product_id=p.id JOIN ingredients i ON i.sku=v.ingredient_sku
+('Salmón premium','Salmón',800),('Salmón premium','Sal',12),('Salmón premium','Aceite vegetal',20),
+('Pollo grillado','Pechuga de pollo',800),('Pollo grillado','Sal',12),('Pollo grillado','Aceite vegetal',20),('Pollo grillado','Ajo',2),
+('Carne mechada','Carne de vacuno',1000),('Carne mechada','Sal',6),('Carne mechada','Zanahoria',100),('Carne mechada','Cebolla',100),('Carne mechada','Ajo',2),
+('Vegetales rostizados','Vegetales mixtos',1000),('Vegetales rostizados','Aceite vegetal',30),('Vegetales rostizados','Sal',8),
+('Arroz primavera','Arroz',1000),('Arroz primavera','Vegetales mixtos',400),('Arroz primavera','Aceite vegetal',30),('Arroz primavera','Sal',12),
+('Papas rústicas','Papa',1500),('Papas rústicas','Aceite vegetal',40),('Papas rústicas','Romero',8),('Papas rústicas','Sal',12),
+('Arroz blanco','Arroz',1000),('Arroz blanco','Aceite vegetal',20),('Arroz blanco','Sal',12),
+('Tallarines con salsa roja','Tallarines secos',1000),('Tallarines con salsa roja','Salsa de tomate',800),('Tallarines con salsa roja','Cebolla',100),('Tallarines con salsa roja','Ajo',2),('Tallarines con salsa roja','Aceite vegetal',20),
+('Tallarines con salsa verde','Tallarines secos',1000),('Tallarines con salsa verde','Albahaca',200),('Tallarines con salsa verde','Queso',150),('Tallarines con salsa verde','Ajo',2),('Tallarines con salsa verde','Aceite vegetal',250),
+('Ensalada fresca','Lechuga',600),('Ensalada fresca','Pepino',300),('Ensalada fresca','Zanahoria',300),('Ensalada fresca','Aceite vegetal',20),('Ensalada fresca','Sal',8),
+('Ensalada chilena','Tomate',900),('Ensalada chilena','Cebolla',500),('Ensalada chilena','Aceite vegetal',20),('Ensalada chilena','Sal',8),
+('Mousse de chocolate','Chocolate',300),('Mousse de chocolate','Crema',500),('Mousse de chocolate','Azúcar',100),('Fruta de estación','Fruta de estación',1200),
+('Empanada de queso','Harina',1000),('Empanada de queso','Queso',600),('Empanada de queso','Aceite vegetal',100),('Empanada de queso','Sal',20)
+) v(product_name,ingredient_name,quantity)
+JOIN products p ON p.name=v.product_name JOIN recipes r ON r.product_id=p.id JOIN ingredients i ON i.name=v.ingredient_name
 WHERE NOT EXISTS (SELECT 1 FROM recipe_ingredients ri WHERE ri.recipe_id=r.id AND ri.ingredient_id=i.id);

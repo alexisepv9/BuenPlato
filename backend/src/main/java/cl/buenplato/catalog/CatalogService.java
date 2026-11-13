@@ -43,8 +43,7 @@ public class CatalogService {
         if (search != null && !search.isBlank()) {
             String term = "%" + search.trim().toLowerCase(Locale.ROOT) + "%";
             spec = spec.and((root, query, cb) -> cb.or(
-                    cb.like(cb.lower(root.get("name")), term),
-                    cb.like(cb.lower(root.get("sku")), term)
+                    cb.like(cb.lower(root.get("name")), term)
             ));
         }
         if (category != null && !category.isBlank()) {
@@ -79,17 +78,13 @@ public class CatalogService {
 
     @Transactional
     public ProductResponse createProduct(ProductCreateRequest request) {
-        String sku = request.sku().trim().toUpperCase(Locale.ROOT);
-        if (products.existsBySkuIgnoreCase(sku)) {
-            throw new IllegalArgumentException("Ya existe un producto con ese SKU.");
-        }
+        // Código interno automático; no requiere intervención del usuario.
         Category category = categories.findById(request.categoryId())
                 .filter(Category::isActive)
                 .orElseThrow(() -> new IllegalArgumentException("La categoría seleccionada no existe."));
 
         Product product = new Product(
                 category,
-                sku,
                 request.name().trim(),
                 request.description() == null ? "" : request.description().trim(),
                 request.price(),
@@ -104,17 +99,12 @@ public class CatalogService {
     @Transactional
     public ProductResponse updateProduct(Long id, ProductUpdateRequest request) {
         Product product = activeProduct(id);
-        String sku = request.sku().trim().toUpperCase(Locale.ROOT);
-        if (products.existsBySkuIgnoreCaseAndIdNot(sku, id)) {
-            throw new IllegalArgumentException("Ya existe otro producto con ese SKU.");
-        }
         Category category = categories.findById(request.categoryId())
                 .filter(Category::isActive)
                 .orElseThrow(() -> new IllegalArgumentException("La categoría seleccionada no existe."));
 
         product.update(
                 category,
-                sku,
                 request.name().trim(),
                 request.description() == null ? "" : request.description().trim(),
                 request.price(),

@@ -21,41 +21,38 @@ public class InventoryService {
     public List<IngredientResponse> listIngredients(String search, String status) {
         String term = search == null ? "" : search.trim().toLowerCase(Locale.ROOT);
         return jdbc.query("""
-                SELECT id, sku, name, base_unit, stock, low_stock_threshold, unit_cost, image_url
+                SELECT id, name, base_unit, stock, low_stock_threshold, unit_cost, image_url, category_id
                 FROM ingredients WHERE active = TRUE
-                  AND (? = '' OR LOWER(name) LIKE ? OR LOWER(sku) LIKE ?)
+                  AND (? = '' OR LOWER(name) LIKE ?)
                 ORDER BY name
                 """, (rs, row) -> ingredient(
-                rs.getLong("id"), rs.getString("sku"), rs.getString("name"),
+                rs.getLong("id"), rs.getString("name"),
                 rs.getString("base_unit"), rs.getBigDecimal("stock"),
-                rs.getBigDecimal("low_stock_threshold"), rs.getBigDecimal("unit_cost"), rs.getString("image_url")
-        ), term, "%" + term + "%", "%" + term + "%").stream()
+                rs.getBigDecimal("low_stock_threshold"), rs.getBigDecimal("unit_cost"), rs.getString("image_url"), rs.getLong("category_id")
+        ), term, "%" + term + "%").stream()
                 .filter(item -> status == null || status.isBlank() || item.stockStatus().equals(status))
                 .toList();
     }
 
     @Transactional
     public IngredientResponse createIngredient(IngredientRequest request) {
-        String sku = normalizedSku(request.sku());
-        if (count("SELECT COUNT(*) FROM ingredients WHERE UPPER(sku) = ?", sku) > 0) {
-            throw new IllegalArgumentException("Ya existe una materia prima con ese SKU.");
-        }
+        requireCategory(request.categoryId());
         UnitValue stock = normalize(request.stock(), request.unit());
         UnitValue threshold = normalize(request.lowStockThreshold(), request.unit());
         BigDecimal baseCost = normalizeCost(request.unitCost(), request.unit());
         var key = new GeneratedKeyHolder();
         jdbc.update(connection -> {
             var statement = connection.prepareStatement("""
-                    INSERT INTO ingredients (sku, name, base_unit, stock, low_stock_threshold, unit_cost, image_url)
+                    INSERT INTO ingredients (name, base_unit, stock, low_stock_threshold, unit_cost, image_url, category_id)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                     """, new String[]{"id"});
-            statement.setString(1, sku);
-            statement.setString(2, request.name().trim());
-            statement.setString(3, stock.baseUnit());
-            statement.setBigDecimal(4, stock.quantity());
-            statement.setBigDecimal(5, threshold.quantity());
-            statement.setBigDecimal(6, baseCost);
-            statement.setString(7, request.imageUrl());
+            statement.setString(1, request.name().trim());
+            statement.setString(2, stock.baseUnit());
+            statement.setBigDecimal(3, stock.quantity());
+            statement.setBigDecimal(4, threshold.quantity());
+            statement.setBigDecimal(5, baseCost);
+            statement.setString(6, request.imageUrl());
+            statement.setLong(7, request.categoryId());
             return statement;
         }, key);
         return findIngredient(Objects.requireNonNull(key.getKey()).longValue());
@@ -64,20 +61,17 @@ public class InventoryService {
     @Transactional
     public IngredientResponse updateIngredient(long id, IngredientRequest request) {
         IngredientResponse current = findIngredient(id);
-        String sku = normalizedSku(request.sku());
-        if (count("SELECT COUNT(*) FROM ingredients WHERE UPPER(sku) = ? AND id <> ?", sku, id) > 0) {
-            throw new IllegalArgumentException("Ya existe otra materia prima con ese SKU.");
-        }
+        requireCategory(request.categoryId());
         UnitValue stock = normalize(request.stock(), request.unit());
         UnitValue threshold = normalize(request.lowStockThreshold(), request.unit());
         if (!current.baseUnit().equals(stock.baseUnit())) {
             throw new IllegalArgumentException("No se puede cambiar entre unidades de peso, volumen y unidad.");
         }
         jdbc.update("""
-                UPDATE ingredients SET sku=?, name=?, stock=?, low_stock_threshold=?, unit_cost=?, image_url=?,
+                UPDATE ingredients SET name=?, stock=?, low_stock_threshold=?, unit_cost=?, image_url=?, category_id=?,
                     updated_at=CURRENT_TIMESTAMP WHERE id=? AND active=TRUE
-                """, sku, request.name().trim(), stock.quantity(), threshold.quantity(),
-                normalizeCost(request.unitCost(), request.unit()), request.imageUrl(), id);
+                """, request.name().trim(), stock.quantity(), threshold.quantity(),
+                normalizeCost(request.unitCost(), request.unit()), request.imageUrl() == null ? current.imageUrl() : request.imageUrl(), request.categoryId(), id);
         return findIngredient(id);
     }
 
@@ -119,7 +113,10 @@ public class InventoryService {
             jdbc.update(connection -> {
                 PreparedStatement statement = connection.prepareStatement(
                         "INSERT INTO recipes(product_id,yield_quantity) VALUES (?,?)", new String[]{"id"});
-                statement.setLong(1, productId); statement.setBigDecimal(2, request.yieldQuantity()); return statement;
+                // Cada parámetro corresponde a su columna: producto (1), rendimiento (2).
+                statement.setLong(1, productId);
+                statement.setBigDecimal(2, request.yieldQuantity());
+                return statement;
             }, key);
             recipeId = Objects.requireNonNull(key.getKey()).longValue();
         } else {
@@ -156,18 +153,24 @@ public class InventoryService {
 
     private IngredientResponse findIngredient(long id) {
         IngredientResponse result = jdbc.query("""
-                SELECT id,sku,name,base_unit,stock,low_stock_threshold,unit_cost,image_url
+                SELECT id,name,base_unit,stock,low_stock_threshold,unit_cost,image_url,category_id
                 FROM ingredients WHERE id=? AND active=TRUE
-                """, rs -> rs.next() ? ingredient(rs.getLong("id"),rs.getString("sku"),rs.getString("name"),
+                """, rs -> rs.next() ? ingredient(rs.getLong("id"),rs.getString("name"),
                 rs.getString("base_unit"),rs.getBigDecimal("stock"),rs.getBigDecimal("low_stock_threshold"),
-                rs.getBigDecimal("unit_cost"),rs.getString("image_url")) : null, id);
+                rs.getBigDecimal("unit_cost"),rs.getString("image_url"), rs.getLong("category_id")) : null, id);
         if (result == null) throw new IllegalArgumentException("La materia prima no existe.");
         return result;
     }
 
-    private IngredientResponse ingredient(long id,String sku,String name,String unit,BigDecimal stock,BigDecimal threshold,BigDecimal cost,String imageUrl) {
+    private IngredientResponse ingredient(long id,String name,String unit,BigDecimal stock,BigDecimal threshold,BigDecimal cost,String imageUrl,long categoryId) {
         String status = stock.signum()==0 ? "OUT_OF_STOCK" : stock.compareTo(threshold)<=0 ? "LOW_STOCK" : "NORMAL";
-        return new IngredientResponse(id,sku,name,unit,stock,threshold,cost,status,imageUrl);
+        return new IngredientResponse(id,name,unit,stock,threshold,cost,status,imageUrl,categoryId);
+    }
+
+    /** Reject unknown or inactive categories before persisting an ingredient. */
+    private void requireCategory(Long id) {
+        if (id == null || jdbc.queryForList("SELECT id FROM ingredient_categories WHERE id=? AND active=TRUE FOR UPDATE", Long.class, id).isEmpty())
+            throw new IllegalArgumentException("Selecciona una categoría de insumo válida.");
     }
 
     private UnitValue normalize(BigDecimal quantity, String unit) {
@@ -189,6 +192,5 @@ public class InventoryService {
     }
 
     private long count(String sql, Object... args) { return jdbc.queryForObject(sql, Long.class, args); }
-    private String normalizedSku(String value) { return value.trim().toUpperCase(Locale.ROOT); }
     private record UnitValue(BigDecimal quantity, String baseUnit) {}
 }

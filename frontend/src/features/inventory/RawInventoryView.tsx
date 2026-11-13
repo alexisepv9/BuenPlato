@@ -4,14 +4,17 @@ import { useEffect, useState } from "react";
 import { apiClient, apiErrorMessage } from "../../lib/api";
 import { DishImage } from "../../components/DishImage";
 import { ProductPhotoEditor } from "../../components/ProductPhotoEditor";
+import { IngredientCategoriesDialog } from "./IngredientCategoriesDialog";
+import { IngredientQuantityFields } from "./IngredientQuantityFields";
+import { LocalPhotoField } from "../../components/LocalPhotoField";
 import type { Category, InventoryStatusFilter, Product, Ingredient, Recipe } from "../../types/domain";
 import { currency, fieldClass } from "../../lib/presentation";
 import { Icon, FloatingAlert, BrandedLoader, PageHeader, StatusPill, MetricCard, Field } from "../../components/ui";
 
 export function readableQuantity(quantity: number, unit: string) {
   if (unit === "G" && quantity >= 1000) return `${quantity / 1000} kg`;
-  if (unit === "ML" && quantity >= 1000) return `${quantity / 1000} l`;
-  return `${quantity} ${unit === "UNIT" ? "unidades" : unit.toLowerCase()}`;
+  if (unit === "ML" && quantity >= 1000) return `${quantity / 1000} L`;
+  return `${quantity} ${unit === "UNIT" ? "unidades" : unit === "ML" ? "mL" : unit === "L" ? "L" : unit.toLowerCase()}`;
 }
 
 /** Presenta las cantidades almacenadas en unidades cómodas para el usuario. */
@@ -24,16 +27,18 @@ export function ingredientInputUnit(baseUnit: string) {
 }
 
 /** Imagen opcional con alternativa legible cuando el enlace no está disponible. */
-export function IngredientImage({ url, name }: { url?: string | null; name: string }) {
+export function IngredientImage({ url, name, unit }: { url?: string | null; name: string; unit?: string }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [url]);
   return <div className="mb-4 grid h-32 place-items-center overflow-hidden rounded-xl bg-[var(--brand-soft)] text-[#b78a61]">
-    {url && !failed ? <img src={url} alt={name} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} className="h-full w-full object-cover" /> : <div className="text-center"><Icon name="wheat-awn" className="text-3xl" /><span className="mt-2 block text-xs">Sin imagen</span></div>}
+    {url && !failed ? <img src={url} alt={name} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} className="h-full w-full object-cover" /> : <div className="text-center"><Icon name={unit === "ML" ? "droplet" : unit === "G" ? "weight-hanging" : "cubes-stacked"} className="text-3xl" /><span className="mt-2 block text-xs">{unit === "ML" ? "Volumen · L / mL" : unit === "G" ? "Peso · kg / g" : "Unidades"}</span></div>}
   </div>;
 }
 
 /** Inventario real de materias primas y consulta de recetas de producción. */
-export function RawInventoryView({ ingredients, products, categories, loading, error, success, search, statusFilter, onSearch, onStatus, onChanged }: {
+export function RawInventoryView({ section, ingredients, products, categories, loading, error, success, search, statusFilter, onSearch, onStatus, onChanged }: {
+  /** La navegación principal elige la pantalla; no hay pestañas que mezclen ambos inventarios. */
+  section: "ingredients" | "recipes";
   ingredients: Ingredient[];
   products: Product[];
   categories: Category[];
@@ -46,12 +51,34 @@ export function RawInventoryView({ ingredients, products, categories, loading, e
   onStatus: (value: InventoryStatusFilter) => void;
   onChanged: (message: string, refresh?: boolean) => void;
 }) {
-  const [section, setSection] = useState<"ingredients" | "recipes">("ingredients");
   const [photoRevision, setPhotoRevision] = useState(0);
+  const [ingredientCategories, setIngredientCategories] = useState<{ id: number; name: string }[]>([]);
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [showCategories, setShowCategories] = useState(false);
+  const [newCategory, setNewCategory] = useState("");
+  const [creatingCategory, setCreatingCategory] = useState(false);
+  useEffect(() => {
+    apiClient.get<{ id: number; name: string }[]>("/ingredients/categories")
+      .then(({ data }) => setIngredientCategories(data)).catch(error => setActionError(apiErrorMessage(error)));
+  }, []);
+  /** Crea categorías en el catálogo sin abandonar el formulario ni guardar todavía el insumo. */
+  async function createCategory() {
+    if (!newCategory.trim() || creatingCategory) return;
+    setCreatingCategory(true);
+    try {
+      const { data } = await apiClient.post<{ id: number; name: string }[]>("/ingredients/categories", { name: newCategory.trim() });
+      setIngredientCategories(data); setNewCategory("");
+    } catch (error) { setActionError(apiErrorMessage(error)); }
+    finally { setCreatingCategory(false); }
+  }
   // La fotografía se guarda por separado: no mezcla sus acciones con la receta.
   const [photoRecipe, setPhotoRecipe] = useState<Recipe | null>(null);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [editing, setEditing] = useState<Ingredient | null | "new">(null);
+  const [ingredientPhoto, setIngredientPhoto] = useState<File | null>(null);
+  const [savingIngredient, setSavingIngredient] = useState(false);
+  // Cambiar/cerrar el formulario descarta solamente la selección local no guardada.
+  useEffect(() => { setIngredientPhoto(null); }, [editing]);
   const [deleting, setDeleting] = useState<Ingredient | null>(null);
   const [actionError, setActionError] = useState("");
   const [editingRecipe, setEditingRecipe] = useState<Recipe | "new" | null>(null);
@@ -60,7 +87,9 @@ export function RawInventoryView({ ingredients, products, categories, loading, e
   const low = ingredients.filter((item) => item.stockStatus === "LOW_STOCK").length;
   const out = ingredients.filter((item) => item.stockStatus === "OUT_OF_STOCK").length;
   const value = ingredients.reduce((sum, item) => sum + item.stock * item.unitCost, 0);
-  const visible = statusFilter ? ingredients.filter((item) => item.stockStatus === statusFilter) : ingredients;
+  const visible = ingredients.filter(item => (!statusFilter || item.stockStatus === statusFilter)
+    && (!categoryFilter || item.categoryId === Number(categoryFilter))
+    && item.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
   const preparedWithoutRecipe = products.filter((product) => product.category.slug !== "bebestibles" && !recipes.some((recipe) => recipe.productId === product.id));
 
   useEffect(() => {
@@ -69,20 +98,36 @@ export function RawInventoryView({ ingredients, products, categories, loading, e
 
   async function saveIngredient(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (savingIngredient) return;
+    setSavingIngredient(true);
     const form = new FormData(event.currentTarget);
     const payload = {
-      sku: String(form.get("sku") ?? ""), name: String(form.get("name") ?? ""),
-      imageUrl: String(form.get("imageUrl") ?? "").trim(),
+      name: String(form.get("name") ?? ""),
+      categoryId: Number(form.get("categoryId")),
       unit: String(form.get("unit") ?? "G"), stock: Number(form.get("stock")),
       lowStockThreshold: Number(form.get("lowStockThreshold")), unitCost: Number(form.get("unitCost")),
     };
     try {
       setActionError("");
-      if (editing === "new") await apiClient.post("/ingredients", payload);
-      else await apiClient.put(`/ingredients/${editing?.id}`, payload);
+      const { data: saved } = editing === "new"
+        ? await apiClient.post<Ingredient>("/ingredients", payload)
+        : await apiClient.put<Ingredient>(`/ingredients/${editing?.id}`, payload);
+      if (ingredientPhoto) {
+        const photo = new FormData(); photo.append("file", ingredientPhoto);
+        try {
+          await apiClient.post(`/ingredients/${saved.id}/photo`, photo, { headers: { "Content-Type": null } });
+        } catch (failure) {
+          // El insumo ya existe: conservar su id evita duplicarlo al reintentar.
+          setEditing(saved);
+          onChanged("Los datos del insumo se guardaron; falta cargar su fotografía.");
+          setActionError(`Los datos están guardados. Selecciona nuevamente la foto: ${apiErrorMessage(failure)}`);
+          return;
+        }
+      }
       setEditing(null);
       onChanged(`${payload.name} fue guardado correctamente.`);
     } catch (requestError) { setActionError(apiErrorMessage(requestError)); }
+    finally { setSavingIngredient(false); }
   }
 
   async function deleteIngredient() {
@@ -117,7 +162,7 @@ export function RawInventoryView({ ingredients, products, categories, loading, e
       // necesita conocer ni seleccionar identificadores internos del catálogo.
       if (!productId) {
         const { data: createdProduct } = await apiClient.post<Product>("/products", {
-          categoryId: Number(form.get("categoryId")), sku: `PREP-${Date.now()}`,
+          categoryId: Number(form.get("categoryId")),
           name: productName, description: "Preparación elaborada en el local.",
           price: Number(form.get("price")), unit: "PORCION", stock: 0,
           lowStockThreshold: 0, trackStock: true,
@@ -136,13 +181,10 @@ export function RawInventoryView({ ingredients, products, categories, loading, e
 
 
   return <div className="mx-auto max-w-[1380px]">
+    {showCategories && <IngredientCategoriesDialog categories={ingredientCategories} onClose={() => setShowCategories(false)} onChanged={items => { setIngredientCategories(items); setCategoryFilter(""); onChanged("Categorías actualizadas."); }} />}
     <FloatingAlert message={success} tone="success" />
     <FloatingAlert message={actionError} />
-    <PageHeader eyebrow="Bodega y producción" title={section === "ingredients" ? "Materias primas" : "Recetas de platos"} description={section === "ingredients" ? "Revisa existencias, actualiza cantidades y configura las alertas de tus ingredientes." : "Define los ingredientes y porciones de cada plato. Gestiona su fotografía por separado."} icon="wheat-awn" actions={<button className="h-11 rounded-xl bg-[var(--brand-primary)] px-4 text-xs font-extrabold text-white" onClick={() => section === "ingredients" ? setEditing("new") : openRecipe("new")}><Icon name="plus" className="mr-2" />{section === "ingredients" ? "Nueva materia prima" : "Nueva preparación"}</button>} />
-    <div className="mt-5 flex gap-2 rounded-2xl bg-white p-2 shadow-sm">
-      <button onClick={() => setSection("ingredients")} className={`h-10 flex-1 rounded-xl text-xs font-extrabold ${section === "ingredients" ? "bg-[var(--brand-primary)] text-white" : "text-[var(--brand-muted)]"}`}>Materias primas</button>
-      <button onClick={() => setSection("recipes")} className={`h-10 flex-1 rounded-xl text-xs font-extrabold ${section === "recipes" ? "bg-[var(--brand-primary)] text-white" : "text-[var(--brand-muted)]"}`}>Recetas de platos</button>
-    </div>
+    <PageHeader eyebrow="Bodega y producción" title={section === "ingredients" ? "Insumos" : "Productos"} description={section === "ingredients" ? "Revisa existencias, actualiza cantidades y configura las alertas de tus ingredientes." : "Define los ingredientes y porciones de cada plato. Gestiona su fotografía por separado."} icon="wheat-awn" actions={<div className="flex flex-wrap gap-2">{section === "ingredients" && <button type="button" onClick={() => setShowCategories(true)} className="h-11 rounded-xl border border-white/50 px-4 text-sm font-semibold"><Icon name="tags" className="mr-2" />Categorías</button>}<button className="h-11 rounded-xl bg-[var(--brand-primary)] px-4 text-xs font-extrabold text-white" onClick={() => section === "ingredients" ? setEditing("new") : openRecipe("new")}><Icon name="plus" className="mr-2" />{section === "ingredients" ? "Nueva materia prima" : "Nueva preparación"}</button></div>} />
     {section === "ingredients" ? <>
       <section className="mt-5 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <MetricCard icon="wheat-awn" label="Materias primas" value={ingredients.length} helper="Ingredientes activos" tone="green" active={!statusFilter} onClick={() => onStatus("")} />
@@ -151,11 +193,11 @@ export function RawInventoryView({ ingredients, products, categories, loading, e
         <MetricCard icon="circle-xmark" label="Agotados" value={out} helper="Sin disponibilidad" tone="red" active={statusFilter === "OUT_OF_STOCK"} onClick={() => onStatus(statusFilter === "OUT_OF_STOCK" ? "" : "OUT_OF_STOCK")} />
       </section>
       <section className="mt-5 overflow-hidden rounded-[24px] border border-white bg-white shadow-sm">
-        <div className="p-4"><input className={fieldClass} type="search" value={search} onChange={(event) => onSearch(event.target.value)} placeholder="Buscar arroz, aceite, carne o SKU" /></div>
+        <div className="grid gap-3 p-4 sm:grid-cols-2"><input className={fieldClass} type="search" value={search} onChange={(event) => onSearch(event.target.value)} placeholder="Buscar insumo por nombre" /><select aria-label="Filtrar insumos por categoría" className={fieldClass} value={categoryFilter} onChange={event => setCategoryFilter(event.target.value)}><option value="">Todas las categorías</option>{ingredientCategories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}</select><p className="text-xs text-muted">{visible.length} insumos encontrados</p></div>
         {loading ? <BrandedLoader label="Actualizando bodega" /> : error ? <p className="p-5 text-xs text-red-700">{error}</p> : <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">{visible.map((item) => <article key={item.id} className="rounded-2xl border border-[var(--brand-border)] bg-[var(--brand-background)] p-4">
-          <IngredientImage url={item.imageUrl} name={item.name} />
-          <div className="flex items-start justify-between"><div><span className="text-[9px] font-bold text-[#a17b55]">{item.sku}</span><h3 className="mt-1 text-sm font-extrabold">{item.name}</h3></div><StatusPill status={item.stockStatus} /></div>
-          <strong className="mt-5 block text-2xl text-[var(--brand-secondary)]">{readableQuantity(Number(item.stock), item.baseUnit)}</strong>
+          <IngredientImage url={item.imageUrl} name={item.name} unit={item.baseUnit} />
+          <div className="flex items-start justify-between"><div><h3 className="mt-1 text-base font-semibold">{item.name}</h3></div><StatusPill status={item.stockStatus} /></div>
+          <strong className="mt-5 block text-xl font-medium tabular-nums text-[var(--brand-secondary)]">{readableQuantity(Number(item.stock), item.baseUnit)}</strong>
           <p className="mt-1 text-[10px] text-[var(--brand-muted)]">Alerta: {readableQuantity(Number(item.lowStockThreshold), item.baseUnit)} · Valor {currency.format(item.stock * item.unitCost)}</p>
           <div className="mt-4 flex flex-wrap gap-2 border-t border-[var(--brand-border)] pt-4"><button onClick={() => setEditing(item)} className="min-h-11 flex-1 rounded-xl bg-[var(--brand-soft)] px-3 text-xs font-bold"><Icon name="pen" className="mr-2" />Editar datos y stock</button><button onClick={() => setDeleting(item)} className="min-h-11 rounded-xl px-3 text-xs font-bold text-[#b9472e] hover:bg-[#fde9e4]" aria-label={`Retirar ${item.name}`}><Icon name="trash" className="mr-2" />Retirar</button></div>
         </article>)}</div>}
@@ -171,15 +213,16 @@ export function RawInventoryView({ ingredients, products, categories, loading, e
         <button onClick={() => setPhotoRecipe(recipe)} className="min-h-11 rounded-xl border border-[var(--brand-border)] px-4 text-xs font-bold"><Icon name="camera" className="mr-2" />Cambiar foto</button>
       </div>
     </article>)}</section></>}
-    {editing && <div className="fixed inset-0 z-50 grid place-items-end bg-black/35 sm:place-items-center sm:p-5"><form onSubmit={saveIngredient} className="max-h-[90dvh] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl">
+    {editing && <div className="fixed inset-0 z-50 grid place-items-end bg-black/35 sm:place-items-center sm:p-5"><form aria-busy={savingIngredient} onSubmit={saveIngredient} className="max-h-[90dvh] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl">
       <div className="flex justify-between"><div><span className="text-[9px] font-bold uppercase text-[var(--brand-primary)]">Bodega</span><h2 className="text-lg font-extrabold">{editing === "new" ? "Nueva materia prima" : "Editar materia prima"}</h2></div><button type="button" onClick={() => setEditing(null)}><Icon name="xmark" /></button></div>
-      <div className="mt-5 grid gap-3 sm:grid-cols-2"><Field label="Nombre"><input className={fieldClass} name="name" required defaultValue={editing === "new" ? "" : editing.name} /></Field><Field label="SKU"><input className={fieldClass} name="sku" required defaultValue={editing === "new" ? "" : editing.sku} /></Field>
-      {editing === "new" ? <Field label="Unidad de ingreso"><select className={fieldClass} name="unit" defaultValue="KG"><option value="KG">Kilogramos</option><option value="G">Gramos</option><option value="L">Litros</option><option value="ML">Mililitros</option><option value="UNIT">Unidades</option></select></Field> : <Field label="Unidad para actualizar"><div className={`${fieldClass} flex items-center bg-[var(--brand-soft)] font-bold`}>{editing.baseUnit === "G" ? "Kilogramos" : editing.baseUnit === "ML" ? "Litros" : "Unidades"}</div><input type="hidden" name="unit" value={ingredientInputUnit(editing.baseUnit)} /></Field>}
-      <Field label={editing === "new" ? "Existencia inicial" : "Existencia actual (puedes modificarla)"}><input className={fieldClass} name="stock" type="number" min="0" step="0.001" required defaultValue={editing === "new" ? 0 : ingredientInputValue(editing.stock, editing.baseUnit)} /></Field><Field label="Nivel para alertar stock bajo"><input className={fieldClass} name="lowStockThreshold" type="number" min="0" step="0.001" required defaultValue={editing === "new" ? 0 : ingredientInputValue(editing.lowStockThreshold, editing.baseUnit)} /></Field><Field label={`Costo por ${editing !== "new" && editing.baseUnit === "UNIT" ? "unidad" : editing !== "new" && editing.baseUnit === "ML" ? "litro" : "kilogramo/unidad seleccionada"}`}><input className={fieldClass} name="unitCost" type="number" min="0" step="0.0001" required defaultValue={editing === "new" ? 0 : (editing.baseUnit === "G" || editing.baseUnit === "ML" ? editing.unitCost * 1000 : editing.unitCost)} /></Field></div>
-      {editing !== "new" && <p className="mt-3 rounded-xl bg-[#fff6e7] px-3 py-2 text-[10px] leading-4 text-[#80633d]"><Icon name="circle-info" className="mr-2" />Modifica la existencia actual y confirma con el botón inferior. Por ejemplo, 10 kg reemplaza el stock actual por 10 kg.</p>}
-      <Field label="Enlace HTTPS de la imagen (opcional)" className="mt-4"><input className={fieldClass} name="imageUrl" type="url" pattern="https://.*" maxLength={2048} placeholder="https://ejemplo.cl/arroz.jpg" defaultValue={editing === "new" ? "" : editing.imageUrl ?? ""} /></Field>
-      <p className="mt-2 text-xs text-muted">Pega el enlace directo a una foto. Deja el campo vacío para quitarla.</p>
-      <div className="sticky bottom-0 mt-5 flex gap-3 border-t border-[var(--brand-border)] bg-white py-3"><button type="button" onClick={() => setEditing(null)} className="h-12 rounded-xl border border-[var(--brand-border)] px-5 text-xs font-bold">Cancelar</button><button className="h-12 flex-1 rounded-xl bg-[var(--brand-primary)] text-xs font-extrabold text-white">{editing === "new" ? "Crear materia prima" : "Guardar cambios"}</button></div>
+      <div className="mt-5 grid gap-3 sm:grid-cols-2"><Field label="Nombre"><input className={fieldClass} name="name" required defaultValue={editing === "new" ? "" : editing.name} /></Field>
+      <Field label="Categoría"><select className={fieldClass} name="categoryId" required defaultValue={editing === "new" ? "" : editing.categoryId}><option value="">Seleccionar categoría</option>{ingredientCategories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}</select></Field>
+      <div className="sm:col-span-2"><label className="text-xs text-muted" htmlFor="new-ingredient-category">¿Falta una categoría? Créala aquí y luego selecciónala.</label><div className="mt-2 flex gap-2"><input id="new-ingredient-category" className={fieldClass} value={newCategory} maxLength={80} placeholder="Nombre de nueva categoría" onChange={event => setNewCategory(event.target.value)} /><button type="button" disabled={creatingCategory || !newCategory.trim()} onClick={() => void createCategory()} className="shrink-0 rounded-xl border border-border px-3 text-sm disabled:opacity-40">{creatingCategory ? "Creando…" : "Crear categoría"}</button></div></div>
+      <IngredientQuantityFields key={editing === "new" ? "new" : editing.id} ingredient={editing === "new" ? null : editing} /></div>
+      {editing !== "new" && <p className="mt-3 rounded-xl bg-[#fff6e7] px-3 py-2 text-[10px] leading-4 text-[#80633d]"><Icon name="circle-info" className="mr-2" />Modifica la existencia actual y confirma con el botón inferior. La cantidad ingresada reemplaza el stock actual. Puedes cambiar entre L y mL, o entre kg y g; no entre volumen y peso.</p>}
+      <LocalPhotoField file={ingredientPhoto} onChange={setIngredientPhoto} currentUrl={editing === "new" ? null : editing.imageUrl} disabled={savingIngredient} />
+      <p className="mt-2 text-xs text-muted">La foto se guarda en el servidor al confirmar. No necesitas un enlace.</p>
+      <div className="sticky bottom-0 mt-5 flex gap-3 border-t border-[var(--brand-border)] bg-white py-3"><button type="button" onClick={() => setEditing(null)} className="h-12 rounded-xl border border-[var(--brand-border)] px-5 text-xs font-bold">Cancelar</button><button disabled={savingIngredient} className="h-12 flex-1 rounded-xl bg-brand text-sm font-semibold text-white disabled:opacity-50">{savingIngredient ? "Guardando…" : editing === "new" ? "Crear insumo" : "Guardar cambios"}</button></div>
     </form></div>}
     {deleting && <div className="fixed inset-0 z-[55] grid place-items-end bg-black/40 sm:place-items-center sm:p-5"><div role="dialog" aria-modal="true" className="w-full max-w-md rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl"><div className="grid size-11 place-items-center rounded-2xl bg-[#fde9e4] text-[#b9472e]"><Icon name="trash" /></div><h2 className="mt-4 text-lg font-extrabold">¿Retirar {deleting.name}?</h2><p className="mt-2 text-xs leading-5 text-[#737d77]">Dejará de aparecer en el inventario. Su historial se conservará. Si está incluida en una receta, primero tendrás que modificar esa preparación.</p><div className="mt-5 grid grid-cols-2 gap-2"><button type="button" onClick={() => setDeleting(null)} className="h-11 rounded-xl border border-[#dedbd5] text-xs font-bold">Cancelar</button><button type="button" onClick={deleteIngredient} className="h-11 rounded-xl bg-[#c94c30] text-xs font-extrabold text-white">Sí, retirar</button></div></div></div>}
     {editingRecipe && <div className="fixed inset-0 z-50 grid place-items-end bg-black/40 sm:place-items-center sm:p-5"><form onSubmit={saveRecipe} className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-white p-5 sm:rounded-3xl">

@@ -235,7 +235,7 @@ Para corregir productos o cantidades usa Modificar pedido completo. Se recalcula
 La pantalla muestra ingredientes de bodega, no platos preparados: arroz, aceite,
 carne, sal, verduras y otros insumos. Puede:
 
-- Buscar por nombre o SKU.
+- Buscar por nombre.
 - Mostrar stock bajo.
 - Mostrar productos agotados.
 - Cambiar de página si existen muchos resultados.
@@ -250,14 +250,14 @@ Estados:
 ### 6.2 Crear una materia prima
 
 1. Pulse **Nueva materia prima**.
-2. Ingrese un SKU único, por ejemplo `MP-ARROZ`.
+2. Seleccione una categoría para el insumo.
 3. Escriba el nombre.
 4. Seleccione kg, g, l, ml o unidades.
 5. Indique existencia, umbral de alerta y costo por la unidad seleccionada.
 6. Guarde y confirme que aparezca en la lista.
 
 El sistema convierte kg a g y litros a ml para realizar descuentos exactos. El
-SKU no puede repetirse.
+identificador interno (ID) se asigna automáticamente; no se solicita SKU.
 
 ### 6.3 Recetas y descuento automático
 
@@ -278,7 +278,7 @@ zanahoria, 25 g de cebolla y 0,5 unidad de ajo. Al vender cuatro porciones se
 descuenta el lote completo. Si falta cualquier ingrediente, la venta se rechaza
 y ningún stock queda parcialmente modificado.
 
-Use **Editar** para corregir nombre, SKU, existencia actual, alerta o costo y
+Use **Editar** para corregir nombre, categoría, existencia actual, alerta o costo y
 confirme con **Actualizar materia prima**. Los productos de peso se muestran en
 kilogramos y los de volumen en litros para evitar tener que editar cifras como
 10.000 g o 5.000 ml. La cantidad ingresada reemplaza la existencia actual; no
@@ -365,7 +365,7 @@ El navegador descargará un archivo cuyo nombre contiene las fechas consultadas.
 En el acceso, pulse el icono de **ojo** del campo Contraseña para mostrar lo
 escrito. Al pulsarlo nuevamente, la contraseña vuelve a ocultarse. Esta acción
 no guarda ni modifica la clave.
-| Producto no se guarda | Revise campos obligatorios, SKU duplicado y valores negativos. |
+| Producto no se guarda | Revise campos obligatorios, categoría y valores negativos. |
 | Venta rechazada | Revise selecciones obligatorias y stock disponible. |
 | Datos financieros incompletos | Verifique costos, gastos y ventas registrados en el período. |
 | Error de API | Anote mensaje, hora y acción; entregue esos datos a soporte. |
@@ -404,6 +404,18 @@ no guarda ni modifica la clave.
 
 ### Actualización: acciones del inventario
 
+Cada insumo tiene una **Categoría** obligatoria. Selecciónala al crear o editar; si falta, escribe su nombre en «Nombre de nueva categoría», pulsa «Crear categoría» y selecciónala. En el listado, «Todas las categorías» permite filtrar junto al buscador y al estado de stock. Los registros anteriores quedan en «Sin clasificar» hasta que los asignes. Las categorías de insumos son independientes de las de productos; una categoría «Bebidas» no activa por sí sola su venta. Para instalar este cambio, reinicia el backend: Flyway ejecuta V8 automáticamente.
+
+Para actualizar litros o cantidades existentes, abre «Editar datos y stock». «Unidad de medida» permite elegir Litros (L) o Mililitros (mL) para líquidos, y Kilogramos (kg) o Gramos (g) para peso. Al cambiar entre unidades equivalentes se convierten existencia, umbral y costo; después puedes escribir la cantidad real y guardar. No se convierte volumen en peso. Las tarjetas muestran L mayúscula para distinguirla del número 1; sin foto, usan gota para volumen, pesa para peso y bloques para unidades.
+
+El SKU fue eliminado del modelo actual. Los productos e insumos se identifican mediante su ID interno. Después de actualizar el backend local, detén su proceso con Ctrl+C y vuelve a ejecutar `mvn spring-boot:run` desde `backend`; recargar solamente el navegador no actualiza las validaciones Java.
+
+En **Insumos → Nueva materia prima / Editar datos y stock**, selecciona una foto del dispositivo o arrástrala al recuadro. Ya no se solicita enlace ni SKU: el ID interno se genera automáticamente. JPG/PNG, hasta 5 MB, mínimo 640 × 360 y máximo 4096 × 4096 píxeles. Al guardar, la imagen se almacena en el servidor y aparece en la tarjeta. Sin nueva selección se conserva la foto actual. Si los datos se guardan pero falla la imagen, se informa del resultado parcial; selecciona otra foto y reintenta sobre el mismo insumo, sin duplicarlo.
+
+La navegación comparte orden en escritorio y celular: **Venta, Productos, Insumos, Finanzas, Configuración**. Las opciones dependen de permisos, no de la sección activa. El lateral de escritorio permanece visible al desplazarse. Las tarjetas muestran nombres sin SKU y cantidades con menor peso tipográfico.
+
+La navegación ahora separa **Insumos** y **Productos**, tanto en escritorio como en celular. Ya no se agrupan en las pestañas de Inventario. En Insumos se administran materias primas, existencias y alertas. En Productos se encuentran las preparaciones, sus recetas y fotografías. Ambas opciones mantienen el acceso exclusivo del administrador. El buscador de Insumos no filtra los productos ni los ingredientes disponibles al editar una receta. Las instrucciones anteriores que mencionan «Inventario → Materias primas» corresponden ahora a «Insumos»; «Inventario → Recetas de platos» corresponde a «Productos».
+
 Para cargar una foto, abre «Cambiar foto» y pulsa «Seleccionar imagen», o arrastra un JPG/PNG al recuadro. Se muestra una vista previa y el nombre del archivo. «Elegir otra» reemplaza la selección; «Quitar selección» la descarta sin borrar la foto guardada. Confirma con «Guardar foto». Solo se admite una imagen de hasta 5 MB, entre 640 × 360 y 4096 × 4096 píxeles; se recomienda 1280 × 720. La selección no se envía hasta pulsar guardar. El navegador abrirá su selector de archivos habitual, aunque el campo de la página ahora tiene un diseño personalizado.
 
 - **Materias primas:** «Nueva materia prima» crea un ingrediente; «Editar datos y stock» modifica los datos y reemplaza la existencia por la cantidad ingresada. «Guardar cambios» confirma y «Cancelar» descarta los cambios no guardados.
@@ -422,3 +434,20 @@ El manual fue contrastado con la interfaz y las rutas implementadas. Un usuario 
 6. Cerrar sesión y reconocer cuándo solicitar soporte.
 
 La terminología coincide con las pantallas actuales y los límites relevantes están señalados antes de que el usuario dependa de una función inexistente. Recomendación para la próxima versión: añadir capturas numeradas cuando la interfaz visual se estabilice y separar un manual breve para caja.
+
+## Categorías de insumos y retiro de SKU — 13/11/2026
+
+### Error al guardar una preparación
+
+Se corrigió un fallo al asociar por primera vez una receta a un producto: podía responder 500 aunque los datos fueran válidos. La corrección requiere reiniciar el backend para cargar el código actualizado. Si ocurre un 500 al editar nombre, precio o foto, conserve el mensaje de la terminal del backend y señale el campo modificado: ese código por sí solo no identifica la causa. No cree otro producto para intentar resolverlo.
+
+### Listado de categorías con DataTables
+
+**Desactivar categoría:** la confirmación se abre en una ventana independiente con el mismo diseño de edición, ya no debajo de la tabla. Revise el nombre, seleccione una categoría de destino si tiene insumos y pulse **Confirmar desactivación**. **Cancelar**, la cruz o Escape cierran sin cambios mientras no se esté guardando. Durante el envío aparece **Desactivando…** y se bloquean los botones. Si ocurre un error, la ventana conserva la selección para corregirla y reintentar. El foco inicial está en Cancelar para evitar confirmaciones accidentales.
+
+Abra **Insumos → Categorías**. La tabla permite buscar por nombre, ordenar pulsando el encabezado **Categoría** y mostrar 5, 10 o 25 registros por página. **Editar** abre una ventana independiente con el nombre actual seleccionado. Modifique el nombre y pulse **Guardar cambios**; mientras se guarda aparece un indicador y se bloquean los botones para evitar envíos repetidos. **Cancelar**, la cruz o Escape cierran sin guardar cuando no hay una petición en curso. Si falla la API, la ventana conserva el texto y muestra el error. El formulario superior se utiliza únicamente para crear categorías. **Desactivar** abre la confirmación con destino para reasignar insumos. La categoría predeterminada no se desactiva. En pantallas estrechas, deslice la tabla horizontalmente si fuera necesario. La búsqueda y paginación solo cambian la visualización, no los datos almacenados.
+
+En **Insumos → Categorías**, el administrador puede crear, renombrar y desactivar categorías sin agregar opciones al menú lateral. Para desactivar una categoría utilizada, seleccione otra como destino: los insumos se reasignan juntos, sin cambiar sus existencias. La categoría inicial no puede desactivarse. En el formulario de insumo se selecciona la categoría y en el listado se puede filtrar por ella.
+
+La migración V9 elimina las columnas SKU; conserva IDs, recetas, ventas y stock. Las migraciones históricas no se modifican y pueden mencionar SKU. Antes de actualizar una instalación existente, respalde la base. Los seeders modificados no reinsertan productos o ingredientes si ese seeder ya se ejecutó anteriormente; las instalaciones nuevas reciben los datos demo. Verificado con pruebas H2; la actualización de una base PostgreSQL existente requiere validación adicional.
+

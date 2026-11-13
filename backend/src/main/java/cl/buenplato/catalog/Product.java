@@ -19,8 +19,6 @@ public class Product {
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
 
-    @Column(nullable = false, unique = true, length = 60)
-    private String sku;
 
     @Column(nullable = false, length = 120)
     private String name;
@@ -56,7 +54,6 @@ public class Product {
 
     public Product(
             Category category,
-            String sku,
             String name,
             String description,
             int price,
@@ -66,7 +63,6 @@ public class Product {
             boolean trackStock
     ) {
         this.category = category;
-        this.sku = sku;
         this.name = name;
         this.description = description;
         this.price = price;
@@ -90,7 +86,6 @@ public class Product {
 
     public void update(
             Category category,
-            String sku,
             String name,
             String description,
             int price,
@@ -100,7 +95,6 @@ public class Product {
             boolean trackStock
     ) {
         this.category = category;
-        this.sku = sku;
         this.name = name;
         this.description = description;
         this.price = price;
@@ -116,7 +110,6 @@ public class Product {
 
     public Long getId() { return id; }
     public Category getCategory() { return category; }
-    public String getSku() { return sku; }
     public String getName() { return name; }
     public String getDescription() { return description; }
     public int getPrice() { return price; }

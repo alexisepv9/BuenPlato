@@ -21,10 +21,20 @@ export function AppShell({
 }) {
   const isAdmin = user.role === "ADMIN";
   const { brand } = useBrand();
-  const activeView = view === "new-product" ? "inventory" : view;
+  // Una sola definición evita diferencias de orden entre escritorio y móvil.
+  const navigation: { view: View; label: string; icon: string; admin?: boolean }[] = [
+    { view: "sales", label: "Venta", icon: "cash-register" },
+    { view: "products", label: "Productos", icon: "utensils", admin: true },
+    { view: "ingredients", label: "Insumos", icon: "boxes-stacked", admin: true },
+    { view: "finance", label: "Finanzas", icon: "chart-line", admin: true },
+    { view: "settings", label: "Configuración", icon: "sliders", admin: true },
+  ];
+  const visibleNavigation = navigation.filter(item => !item.admin || isAdmin);
+  const activeView = view === "new-product" ? "products" : view;
   const pageTitle = {
     sales: "Venta",
-    inventory: "Inventario",
+    ingredients: "Insumos",
+    products: "Productos",
     finance: "Finanzas",
     settings: "Configuración",
     "new-product": "Nuevo producto",
@@ -32,7 +42,7 @@ export function AppShell({
 
   return (
     <div className="min-h-screen bg-[var(--brand-background)] text-[var(--brand-ink)] [background-image:radial-gradient(circle_at_85%_5%,rgba(242,181,68,.12),transparent_23%),radial-gradient(circle_at_10%_90%,rgba(76,147,166,.08),transparent_28%)] lg:grid lg:grid-cols-[264px_1fr]">
-      <aside className="relative hidden min-h-screen flex-col overflow-hidden bg-[radial-gradient(circle_at_10%_5%,var(--brand-primary)_0%,var(--brand-secondary)_42%,var(--brand-secondary)_100%)] px-5 py-6 text-white shadow-[14px_0_45px_rgba(101,48,68,.18)] lg:flex">
+      <aside className="sticky top-0 hidden h-[100dvh] flex-col overflow-y-auto bg-[radial-gradient(circle_at_10%_5%,var(--brand-primary)_0%,var(--brand-secondary)_42%,var(--brand-secondary)_100%)] px-5 py-6 text-white shadow-[14px_0_45px_rgba(101,48,68,.18)] lg:flex">
         <span className="pointer-events-none absolute -top-20 -right-16 size-56 rounded-full border border-white/8" />
         <span className="pointer-events-none absolute -top-6 -right-4 size-24 rounded-full bg-[#f2b544]/10 blur-xl" />
         <div className="relative flex items-center gap-3 px-2">
@@ -47,25 +57,7 @@ export function AppShell({
 
         <p className="relative mt-12 px-3 text-[9px] font-extrabold uppercase tracking-[.18em] text-white/40">Menú principal</p>
         <nav className="relative mt-3 space-y-1.5" aria-label="Navegación principal">
-          {isAdmin && <SidebarItem icon="sliders" label="Configuración" active={activeView === "settings"} onClick={() => onNavigate("settings")} />}
-          <SidebarItem
-            icon="cash-register"
-            label="Venta"
-            active={activeView === "sales"}
-            onClick={() => onNavigate("sales")}
-          />
-          {isAdmin && <SidebarItem
-            icon="boxes-stacked"
-            label="Inventario"
-            active={activeView === "inventory"}
-            onClick={() => onNavigate("inventory")}
-          />}
-          {isAdmin && <SidebarItem
-            icon="chart-line"
-            label="Finanzas"
-            active={activeView === "finance"}
-            onClick={() => onNavigate("finance")}
-          />}
+          {visibleNavigation.map(item => <SidebarItem key={item.view} icon={item.icon} label={item.label} active={activeView === item.view} onClick={() => onNavigate(item.view)} />)}
         </nav>
 
         <div className="relative mt-auto rounded-2xl border border-white/10 bg-white/8 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,.08)] backdrop-blur">
@@ -96,7 +88,6 @@ export function AppShell({
             </div>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            {isAdmin && <button onClick={() => onNavigate("settings")} aria-label="Configuración del negocio" title="Configuración" className="grid size-10 shrink-0 place-items-center rounded-xl border border-border bg-white text-brand lg:hidden"><Icon name="sliders" /></button>}
             <span className="hidden text-right md:block">
               <strong className="block text-[11px] text-[var(--brand-secondary)]">Servicio de almuerzo</strong>
               <small className="text-[10px] text-[#89928d]">Local abierto · Turno actual</small>
@@ -109,10 +100,8 @@ export function AppShell({
         </header>
         <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-5 pt-6 [scrollbar-gutter:stable] md:px-8 md:pb-6 lg:overflow-visible lg:py-8 xl:px-10">{children}</main>
 
-        <nav className={`z-50 mx-3 mt-2 grid shrink-0 ${isAdmin ? "grid-cols-3" : "grid-cols-1"} rounded-[22px] border border-white/80 bg-white/90 p-1.5 shadow-[0_12px_35px_rgba(31,68,58,.18)] backdrop-blur-xl [margin-bottom:max(.75rem,env(safe-area-inset-bottom))] lg:hidden`} aria-label="Navegación móvil">
-          <MobileNavItem icon="cash-register" label="Venta" active={activeView === "sales"} onClick={() => onNavigate("sales")} />
-          {isAdmin && <MobileNavItem icon="boxes-stacked" label="Inventario" active={activeView === "inventory"} onClick={() => onNavigate("inventory")} />}
-          {isAdmin && <MobileNavItem icon="chart-line" label="Finanzas" active={activeView === "finance"} onClick={() => onNavigate("finance")} />}
+        <nav className="z-40 mx-2 mt-2 grid shrink-0 rounded-2xl border border-border bg-white p-1 shadow-sm [margin-bottom:max(.5rem,env(safe-area-inset-bottom))] lg:hidden" style={{ gridTemplateColumns: `repeat(${visibleNavigation.length}, minmax(0, 1fr))` }} aria-label="Navegación móvil">
+          {visibleNavigation.map(item => <MobileNavItem key={item.view} icon={item.icon} label={item.label} active={activeView === item.view} onClick={() => onNavigate(item.view)} />)}
         </nav>
       </div>
     </div>
@@ -160,6 +149,7 @@ export function SidebarItem({
     <button
       type="button"
       onClick={onClick}
+      aria-current={active ? "page" : undefined}
       className={`flex h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-xs font-semibold transition ${
         active ? "bg-white/95 text-[var(--brand-secondary)] shadow-[0_8px_25px_rgba(65,25,39,.18)]" : "text-white/65 hover:bg-white/8 hover:text-white"
       }`}

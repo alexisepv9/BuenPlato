@@ -1,5 +1,9 @@
 # Modelo entidad-relación — Buen Plato
 
+## V8: categorías de insumos
+
+`ingredient_categories` (id PK, name único, active) tiene relación **1:N** con `ingredients`, mediante `ingredients.category_id` (FK, NOT NULL, índice). La migración conserva insumos existentes y asigna «Sin clasificar». Las categorías no se comparten con `categories` del catálogo de productos. Alta/edición valida que la categoría exista y esté activa. La interfaz permite listar y crear categorías; edición y eliminación de categorías quedan pendientes.
+
 Fotos de producto: almacenamiento convencional `storage/products/{productId}.png`,
 una imagen por producto, servida por GET /api/products/{id}/photo. La relación usa
 el identificador existente; no hay nueva columna ni migración. POST en esa ruta
@@ -62,7 +66,6 @@ erDiagram
     PRODUCTS {
         bigint id PK
         bigint category_id FK
-        varchar sku UK
         varchar name
         varchar description
         integer price
@@ -153,7 +156,6 @@ erDiagram
 
     INGREDIENTS {
         bigint id PK
-        varchar sku UK
         varchar name
         varchar base_unit
         numeric stock
@@ -418,3 +420,14 @@ manejable:
 - `tax_documents`: boletas y documentos tributarios electrónicos.
 
 Su incorporación se realizará solamente cuando el flujo funcional lo requiera.
+# Fotos locales de insumos y código interno
+
+Sin cambio de tablas: `ingredients.image_url` referencia `/api/ingredients/{id}/photo?v=...`, con el archivo normalizado en `storage/ingredients`. La migración V9 elimina SKU de productos e insumos; las relaciones conservan sus IDs. Datos y fotografía se guardan en dos peticiones: un error de foto no revierte el insumo; la interfaz informa el resultado parcial y permite reintentar sin duplicarlo.
+
+## Categorías de insumos y retiro de SKU — 13/11/2026
+
+En **Insumos → Categorías**, el administrador puede crear, renombrar y desactivar categorías sin agregar opciones al menú lateral. Para desactivar una categoría utilizada, seleccione otra como destino: los insumos se reasignan juntos, sin cambiar sus existencias. La categoría inicial no puede desactivarse. En el formulario de insumo se selecciona la categoría y en el listado se puede filtrar por ella.
+
+La migración V9 elimina las columnas SKU; conserva IDs, recetas, ventas y stock. Las migraciones históricas no se modifican y pueden mencionar SKU. Antes de actualizar una instalación existente, respalde la base. Los seeders modificados no reinsertan productos o ingredientes si ese seeder ya se ejecutó anteriormente; las instalaciones nuevas reciben los datos demo. Verificado con pruebas H2; la actualización de una base PostgreSQL existente requiere validación adicional.
+
+

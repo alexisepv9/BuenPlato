@@ -1,5 +1,15 @@
 # Memoria del proyecto — Buen Plato
 
+V8 incorpora ingredient_categories y FK obligatoria ingredients.category_id. API ADMIN GET/POST /api/ingredients/categories, categoría requerida en alta/edición; UI permite selección, creación y filtro. Registros existentes/seeders sin categoría explícita usan Sin clasificar (id 1). No clasificar automáticamente por nombres ni confundir con categorías de productos.
+
+Fotos de insumos: POST/GET `/api/ingredients/{id}/photo` (ADMIN), PNG normalizado en `storage/ingredients/{id}.png`. `ingredients.image_url` referencia la ruta local con revisión; editar sin imageUrl conserva la foto. V9 retira SKU de productos e insumos; se conserva el ID como identificador y las relaciones existentes. AppShell usa una sola definición de navegación móvil/escritorio. Aceptación visual del cliente pendiente.
+
+## Planificación de requisitos — 12 de noviembre de 2026
+
+`PLAN_DE_TRABAJO.md` es el seguimiento por módulos del documento de requisitos del cliente. Incluye tareas existentes, parciales, pendientes y decisiones de negocio, con prioridades y criterios de aceptación. «Base» significa código identificado, no funcionalidad certificada. Revisar este plan antes de ampliar usuarios/permisos, inventarios, ventas, mesas o comandas y actualizar sus estados con evidencia al terminar cada tarea. La planificación no cambia el MER vigente ni autoriza por sí sola implementar decisiones pendientes.
+
+Navegación separada: `ingredients` (Insumos) y `products` (Productos/preparaciones) sustituyen la vista `inventory`. RawInventoryView recibe la sección desde App; no tiene pestañas internas. Se reutiliza la lógica existente sin cambiar persistencia ni permisos. Los filtros de Insumos son locales, para conservar todos los ingredientes en el editor de recetas.
+
 Selector de fotos: `ProductPhotoEditor` usa React Dropzone con Tailwind y Font Awesome para selección accesible, arrastre, vista previa y reemplazo. Mantiene Axios multipart y almacenamiento local; no incorpora servicios externos ni cambia el MER. Se abre desde «Cambiar foto» en recetas. Priorizar componentes compartidos y bibliotecas adecuadas, conservando una paleta consistente.
 
 Fotos propias de platos disponibles en Ajustar preparación. POST multipart
@@ -340,3 +350,10 @@ React.
 | 2026-07-30 | Los comentarios deben enseñar el porqué de la implementación y no repetir literalmente lo que ya expresa el código. |
 | 2026-09-10 | Todo producto preparado debe tener receta; una venta sin receta se bloquea. Solo `Bebestibles` usa inventario directo por unidad. |
 | 2026-09-10 | Los seeders de inventario y recetas son aditivos e idempotentes: no sobrescriben existencias, rendimientos ni componentes ajustados. |
+
+## Categorías de insumos y retiro de SKU — 13/11/2026
+
+En **Insumos → Categorías**, el administrador puede crear, renombrar y desactivar categorías sin agregar opciones al menú lateral. Para desactivar una categoría utilizada, seleccione otra como destino: los insumos se reasignan juntos, sin cambiar sus existencias. La categoría inicial no puede desactivarse. En el formulario de insumo se selecciona la categoría y en el listado se puede filtrar por ella.
+
+La migración V9 elimina las columnas SKU; conserva IDs, recetas, ventas y stock. Las migraciones históricas no se modifican y pueden mencionar SKU. Antes de actualizar una instalación existente, respalde la base. Los seeders modificados no reinsertan productos o ingredientes si ese seeder ya se ejecutó anteriormente; las instalaciones nuevas reciben los datos demo. Verificado con pruebas H2; la actualización de una base PostgreSQL existente requiere validación adicional.
+

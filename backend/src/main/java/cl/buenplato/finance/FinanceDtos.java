@@ -51,7 +51,7 @@ public final class FinanceDtos {
     public record Breakdown(String label, long amount, double percentage) {}
     public record TopItem(String name, long quantity, long revenue, long cost, long contribution) {}
     public record HourlySale(int hour, long revenue, long orders) {}
-    public record StockRisk(long productId, String sku, String name, double stock, double threshold, long inventoryValue) {}
+    public record StockRisk(long productId, String name, double stock, double threshold, long inventoryValue) {}
     public record ExpenseRow(long id, LocalDate date, String category, String description, String type, long amount, String paymentMethod) {}
 
     public record ExpenseRequest(

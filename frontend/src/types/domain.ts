@@ -14,7 +14,6 @@ export type InventoryStatusFilter = "" | "LOW_STOCK" | "OUT_OF_STOCK";
 
 export type Product = {
   id: number;
-  sku: string;
   name: string;
   description: string;
   price: number;
@@ -32,8 +31,8 @@ export type ProductPage = {
 };
 
 export type Ingredient = {
+  categoryId: number;
   id: number;
-  sku: string;
   name: string;
   baseUnit: "G" | "ML" | "UNIT";
   imageUrl?: string | null;
@@ -163,8 +162,8 @@ export type FinanceDashboard = {
   topItems: { name: string; quantity: number; revenue: number; cost: number; contribution: number }[];
   hourlySales: { hour: number; revenue: number; orders: number }[];
   expenses: { id: number; date: string; category: string; description: string; type: string; amount: number; paymentMethod: string }[];
-  stockRisks: { productId: number; sku: string; name: string; stock: number; threshold: number; inventoryValue: number }[];
+  stockRisks: { productId: number; name: string; stock: number; threshold: number; inventoryValue: number }[];
   insights: string[];
 };
 
-export type View = "sales" | "inventory" | "finance" | "new-product" | "settings";
+export type View = "sales" | "ingredients" | "products" | "finance" | "new-product" | "settings";

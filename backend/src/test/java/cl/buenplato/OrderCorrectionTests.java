@@ -24,8 +24,8 @@ class OrderCorrectionTests {
     void insufficientStockPreservesOriginalOrderAndAudit() {
         jdbc.update("INSERT INTO categories(name,slug,category_type) VALUES ('Bebidas QA','bebestibles','PRODUCT') ON CONFLICT DO NOTHING");
         Long category = jdbc.queryForObject("SELECT id FROM categories WHERE slug='bebestibles'", Long.class);
-        jdbc.update("INSERT INTO products(category_id,sku,name,price,stock) VALUES (?,'QA-ROLLBACK-DRINK','Agua QA',1000,5)", category);
-        Long product = jdbc.queryForObject("SELECT id FROM products WHERE sku='QA-ROLLBACK-DRINK'", Long.class);
+        jdbc.update("INSERT INTO products(category_id,name,price,stock) VALUES (?,'Agua QA',1000,5)", category);
+        Long product = jdbc.queryForObject("SELECT id FROM products WHERE name='Agua QA'", Long.class);
         var original = sales.createOrder(new CreateOrderRequest(List.of(), List.of(new ExtraItem(product, 2)), null, "TAKEAWAY", "CASH", null));
         var impossible = new CreateOrderRequest(List.of(), List.of(new ExtraItem(product, 99)), null, "TAKEAWAY", "CASH", null);
         assertThatThrownBy(() -> sales.replaceOrder(original.id(), new ReplaceOrderRequest(impossible, 0), "qa"))

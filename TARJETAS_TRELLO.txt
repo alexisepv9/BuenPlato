@@ -1,0 +1,13 @@
+01 · Definición del sistema
+02 · Configuración del negocio
+03 · Usuarios y permisos
+04 · Catálogo de productos y servicios
+05 · Inventario e insumos
+06 · Producción y composiciones — opcional
+07 · Pedidos y ventas
+08 · Cobros y comprobantes
+09 · Mesas y atención — opcional
+10 · Comandas y preparación — opcional
+11 · Reportes y administración
+12 · Notificaciones
+13 · Calidad, seguridad y entrega

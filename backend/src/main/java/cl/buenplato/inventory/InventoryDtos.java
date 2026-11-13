@@ -10,7 +10,7 @@ public final class InventoryDtos {
     private InventoryDtos() {}
 
     public record IngredientRequest(
-            @NotBlank @Size(max = 60) String sku,
+            @NotNull @Positive Long categoryId,
             @NotBlank @Size(max = 120) String name,
             @NotBlank String unit,
             @NotNull @PositiveOrZero BigDecimal stock,
@@ -20,8 +20,8 @@ public final class InventoryDtos {
     ) {}
 
     public record IngredientResponse(
-            long id, String sku, String name, String baseUnit, BigDecimal stock,
-            BigDecimal lowStockThreshold, BigDecimal unitCost, String stockStatus, String imageUrl
+            long id, String name, String baseUnit, BigDecimal stock,
+            BigDecimal lowStockThreshold, BigDecimal unitCost, String stockStatus, String imageUrl, long categoryId
     ) {}
 
     public record RecipeComponentRequest(

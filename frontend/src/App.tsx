@@ -18,7 +18,7 @@ export default function App() {
   const { ready: brandReady } = useBrand();
   const [authUser, setAuthUser] = useState<AuthUser | null | undefined>(undefined);
   const [sessionNotice, setSessionNotice] = useState("");
-  const [view, setView] = useState<View>("inventory");
+  const [view, setView] = useState<View>("ingredients");
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
@@ -55,10 +55,9 @@ export default function App() {
 
   const query = useMemo(() => {
     const params = new URLSearchParams({ size: "100" });
-    if (search.trim()) params.set("search", search.trim());
     if (selectedCategory) params.set("category", selectedCategory);
     return params.toString();
-  }, [search, selectedCategory]);
+  }, [selectedCategory]);
 
   const loadProducts = useCallback(() => {
     if (!authUser) {
@@ -84,20 +83,19 @@ export default function App() {
   const loadIngredients = useCallback(() => {
     if (!authUser || authUser.role !== "ADMIN") return;
     setLoading(true);
-    const params = new URLSearchParams();
-    if (search.trim()) params.set("search", search.trim());
-    apiClient.get<Ingredient[]>(`/ingredients?${params}`)
+    // Las recetas necesitan todos los insumos, sin heredar el buscador de bodega.
+    apiClient.get<Ingredient[]>("/ingredients")
       .then(({ data }) => setIngredients(data))
       .catch((requestError) => setError(apiErrorMessage(requestError)))
       .finally(() => setLoading(false));
-  }, [authUser, search, refreshKey]);
+  }, [authUser, refreshKey]);
 
   useEffect(loadIngredients, [loadIngredients]);
 
   function productCreated(product: Product) {
     setSuccess(`${product.name} fue agregado correctamente al inventario.`);
     setRefreshKey((value) => value + 1);
-    setView("inventory");
+    setView("products");
     window.setTimeout(() => setSuccess(""), 5000);
   }
 
@@ -150,8 +148,10 @@ export default function App() {
               <SalesView />
             ) : view === "finance" ? (
               <FinanceView />
-            ) : view === "inventory" ? (
+            ) : view === "ingredients" || view === "products" ? (
               <RawInventoryView
+                key={view}
+                section={view === "ingredients" ? "ingredients" : "recipes"}
                 ingredients={ingredients}
                 products={products}
                 categories={categories}
@@ -165,7 +165,7 @@ export default function App() {
                 onChanged={inventoryChanged}
               />
             ) : (
-              <NewProductView categories={categories} onCancel={() => navigate("inventory")} onCreated={productCreated} />
+              <NewProductView categories={categories} onCancel={() => navigate("products")} onCreated={productCreated} />
             )}
           </motion.div>
         </AnimatePresence>

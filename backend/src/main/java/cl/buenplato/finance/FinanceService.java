@@ -146,13 +146,12 @@ public class FinanceService {
 
         List<ExpenseRow> expenseRows = expenses(from, to);
         List<StockRisk> stockRisks = jdbc.query("""
-                SELECT id, sku, name, stock, low_stock_threshold, stock * unit_cost inventory_value
+                SELECT id, name, stock, low_stock_threshold, stock * unit_cost inventory_value
                 FROM ingredients
                 WHERE active = TRUE AND stock <= low_stock_threshold
                 ORDER BY stock ASC, name
                 """, (rs, row) -> new StockRisk(
                 rs.getLong("id"),
-                rs.getString("sku"),
                 rs.getString("name"),
                 rs.getDouble("stock"),
                 rs.getDouble("low_stock_threshold"),

@@ -95,7 +95,7 @@ export function InventoryView({
               type="search"
               value={search}
               onChange={(event) => onSearch(event.target.value)}
-              placeholder="Buscar por nombre o SKU"
+              placeholder="Buscar por nombre"
               aria-label="Buscar producto"
             />
           </div>
@@ -240,7 +240,7 @@ export function ProductRow({
           <ProductAvatar product={product} />
           <div className="min-w-0">
             <strong className="block truncate text-xs text-[#223128]">{product.name}</strong>
-            <span className="mt-0.5 block text-[10px] text-[#8a938e]">{product.sku} · {product.description}</span>
+            <span className="mt-0.5 block text-[10px] text-[#8a938e]">{product.description}</span>
           </div>
         </div>
       </td>
@@ -300,7 +300,7 @@ export function ProductMobile({
           <div className="flex items-start justify-between gap-3">
             <div>
               <strong className="block truncate text-xs">{product.name}</strong>
-              <span className="mt-0.5 block text-[10px] text-[#8a938e]">{product.category.name} · {product.sku}</span>
+              <span className="mt-0.5 block text-[10px] text-[#8a938e]">{product.category.name}</span>
             </div>
             <strong className="shrink-0 text-xs">{currency.format(product.price)}</strong>
           </div>
@@ -345,7 +345,6 @@ export function EditProductDialog({
     try {
       const { data: updated } = await apiClient.put<Product>(`/products/${product.id}`, {
         categoryId: Number(data.get("categoryId")),
-        sku: String(data.get("sku") ?? "").trim().toUpperCase(),
         name: String(data.get("name") ?? "").trim(),
         description: String(data.get("description") ?? "").trim(),
         price: Number(data.get("price")),
@@ -378,9 +377,6 @@ export function EditProductDialog({
         <div className="grid gap-4 p-5 sm:grid-cols-2">
           <Field label="Nombre" className="sm:col-span-2">
             <input className={fieldClass} name="name" required maxLength={120} defaultValue={product.name} />
-          </Field>
-          <Field label="SKU">
-            <input className={fieldClass} name="sku" required maxLength={60} defaultValue={product.sku} />
           </Field>
           <Field label="Categoría">
             <select className={fieldClass} name="categoryId" required defaultValue={String(product.category.id)}>
@@ -504,7 +500,6 @@ export function NewProductView({
     try {
       const { data: created } = await apiClient.post<Product>("/products", {
         categoryId: Number(selectedCategory),
-        sku: String(data.get("sku") ?? "").trim().toUpperCase(),
         name: String(data.get("name") ?? "").trim(),
         description: String(data.get("description") ?? "").trim(),
         price: Number(data.get("price")),
@@ -549,9 +544,6 @@ export function NewProductView({
                   maxLength={120}
                   placeholder="Ej. Pechuga de pollo grillada"
                 />
-              </Field>
-              <Field label="SKU" hint="Código único de inventario">
-                <input className={fieldClass} name="sku" required maxLength={60} placeholder="PRO-002" autoCapitalize="characters" />
               </Field>
               <Field label="Unidad de medida">
                 <select className={fieldClass} name="unit" defaultValue="porciones">
@@ -702,7 +694,7 @@ export function NewProductView({
             <Icon name="lightbulb" className="text-[#e2a05f]" />
             <strong className="mt-4 block text-xs">Antes de guardar</strong>
             <ul className="mt-3 space-y-2 text-[10px] leading-4 text-white/55">
-              <li>• Utiliza un SKU único y fácil de identificar.</li>
+              <li>• Los registros se identifican automáticamente.</li>
               <li>• Define el stock mínimo según el consumo diario.</li>
               <li>• El precio se almacena en pesos chilenos.</li>
             </ul>

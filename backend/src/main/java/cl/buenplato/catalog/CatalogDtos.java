@@ -24,7 +24,6 @@ public final class CatalogDtos {
 
     public record ProductCreateRequest(
             @NotNull Long categoryId,
-            @NotBlank @Size(max = 60) String sku,
             @NotBlank @Size(max = 120) String name,
             @Size(max = 500) String description,
             @PositiveOrZero int price,
@@ -36,7 +35,6 @@ public final class CatalogDtos {
 
     public record ProductUpdateRequest(
             @NotNull Long categoryId,
-            @NotBlank @Size(max = 60) String sku,
             @NotBlank @Size(max = 120) String name,
             @Size(max = 500) String description,
             @PositiveOrZero int price,
@@ -48,7 +46,6 @@ public final class CatalogDtos {
 
     public record ProductResponse(
             Long id,
-            String sku,
             String name,
             String description,
             int price,
@@ -67,7 +64,6 @@ public final class CatalogDtos {
                     : "NORMAL";
             return new ProductResponse(
                     product.getId(),
-                    product.getSku(),
                     product.getName(),
                     product.getDescription(),
                     product.getPrice(),
