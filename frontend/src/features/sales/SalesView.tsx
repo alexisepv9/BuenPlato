@@ -1,10 +1,11 @@
 /** Construcción del pedido buffet y productos individuales. El servidor confirma precios y descuenta existencias. */
 import { useCallback, useEffect, useState } from "react";
 import { motion } from "motion/react";
+import { SalesProductCatalog } from "./SalesProductCatalog";
 import { DishImage } from "../../components/DishImage";
 import { openOrderPrint } from "./printOrder";
 import { apiClient, apiErrorMessage } from "../../lib/api";
-import type { SaleOption, SaleSection, SaleProduct, SalesCatalog, MenuCartLine, CreatedOrder, OrderHistory } from "../../types/domain";
+import type { SaleOption, SaleSection, SalesCatalog, MenuCartLine, CreatedOrder, OrderHistory } from "../../types/domain";
 import { currency, fieldClass } from "../../lib/presentation";
 import { Icon, FloatingAlert, BrandedLoader, PageHeader, Field } from "../../components/ui";
 
@@ -17,8 +18,6 @@ export function SalesView() {
   const [catalog, setCatalog] = useState<SalesCatalog | null>(null);
   const [selectedMenuId, setSelectedMenuId] = useState<number | null>(null);
   const [editingMenuKey, setEditingMenuKey] = useState<string | null>(null);
-  const [showIndividualProducts, setShowIndividualProducts] = useState(false);
-  const [individualCategory, setIndividualCategory] = useState("");
   const [menuQuantity, setMenuQuantity] = useState(1);
   const [selections, setSelections] = useState<Record<number, Record<number, number>>>({});
   const [menuLines, setMenuLines] = useState<MenuCartLine[]>([]);
@@ -55,7 +54,7 @@ export function SalesView() {
   function cancelCurrentSale() {
     setReplacingOrder(null);
     loadCatalog();
-    setSelectedMenuId(null); setEditingMenuKey(null); setShowIndividualProducts(false);
+    setSelectedMenuId(null); setEditingMenuKey(null);
     setMenuQuantity(1); setSelections({}); setMenuLines([]); setExtras({});
     setCustomerName(""); setNotes(""); setMobileSummaryOpen(false); setError("");
   }
@@ -117,7 +116,7 @@ export function SalesView() {
     return sectionTotal + optionTotal;
   }, 0) ?? 0;
   // La cantidad replica el menú base; los recargos pertenecen a esta configuración y se cobran una vez.
-  const builderPrice = (selectedMenu?.basePrice ?? 0) * menuQuantity + builderExtrasPerMenu;
+  const builderPrice = (selectedMenu?.basePrice ?? 0) * menuQuantity + builderExtrasPerMenu * (selectedMenu?.kind === "PROMOTION" ? menuQuantity : 1);
   const total = menuLines.reduce((sum, line) => sum + line.totalPrice, 0) + extrasTotal;
   // El borrador sustituye la línea editada en la vista previa, sin duplicar su importe.
   const summaryTotal = selectedMenu
@@ -135,27 +134,15 @@ export function SalesView() {
     : true;
   const hasExtra = Object.values(extras).some((quantity) => quantity > 0);
   const canSubmit = Boolean(menuLines.length || hasExtra) && !selectedMenu && !saving;
-  const productGroups = Object.values(
-    (catalog?.additionalProducts ?? []).reduce<Record<string, { name: string; products: SaleProduct[] }>>(
-      (groups, product) => {
-        const group = groups[product.categorySlug] ?? { name: product.category, products: [] };
-        group.products.push(product);
-        groups[product.categorySlug] = group;
-        return groups;
-      },
-      {},
-    ),
-  );
-  const filteredProductGroups = individualCategory
-    ? productGroups.filter((group) => group.products[0]?.categorySlug === individualCategory)
-    : productGroups;
-
   function chooseMenu(menuId: number) {
     setSelectedMenuId(menuId);
     setEditingMenuKey(null);
-    setShowIndividualProducts(false);
+
     setMenuQuantity(1);
-    setSelections({});
+    // Una sección con una única opción es fija: precarga su mínimo, pero el usuario confirma.
+    const menu = catalog?.menus.find(item => item.id === menuId);
+    setSelections(Object.fromEntries((menu?.sections ?? []).filter(section => section.options.length === 1)
+      .map(section => [section.id, { [section.options[0].id]: section.minimumSelections }])));
     setCreatedOrder(null);
     setError("");
   }
@@ -207,7 +194,7 @@ export function SalesView() {
       : [...current, configuredLine]);
     setSelectedMenuId(null);
     setEditingMenuKey(null);
-    setShowIndividualProducts(false);
+
     setMenuQuantity(1);
     setSelections({});
   }
@@ -219,13 +206,13 @@ export function SalesView() {
   function editMenu(line: MenuCartLine) {
     setSelectedMenuId(line.menu.id);
     setEditingMenuKey(line.key);
-    setShowIndividualProducts(false);
+
     setMenuQuantity(line.quantity);
     setSelections(line.selections);
   }
 
   function changeExtra(productId: number, delta: number, available: number) {
-    if (delta > 0 && available > 0) setMobileSummaryOpen(true);
+    // No abrir el resumen sobre el catálogo al agregar: el total móvil permite abrirlo a demanda.
     setExtras((current) => ({
       ...current,
       [productId]: Math.max(0, Math.min(Math.floor(available), (current[productId] ?? 0) + delta)),
@@ -274,7 +261,7 @@ export function SalesView() {
       }
       setCatalog(current); setMenuLines(lines); setExtras(products); setReplacingOrder(order);
       setCustomerName(order.customerName ?? ""); setServiceType(order.serviceType); setPaymentMethod(order.paymentMethod); setNotes(order.notes ?? "");
-      setSelectedMenuId(null); setEditingMenuKey(null); setEditingOrder(null); setShowIndividualProducts(false);
+      setSelectedMenuId(null); setEditingMenuKey(null); setEditingOrder(null);
       setHistoryOpen(false); setCreatedOrder(null); setMobileSummaryOpen(true); setError("");
     } catch (failure) { setError(apiErrorMessage(failure)); }
   }
@@ -333,13 +320,13 @@ export function SalesView() {
   }
 
   return (
-    <div className="mx-auto max-w-[1380px]">
+    <div className="mx-auto max-w-[1600px]">
       <FloatingAlert message={createdOrder ? `Venta registrada · Pedido ${createdOrder.orderNumber} · ${currency.format(createdOrder.total)}` : ""} tone="success" />
 
       <PageHeader
         eyebrow="Caja abierta"
         title="Nueva venta"
-        description="Arma el pedido buffet o agrega productos individuales."
+        description="Elige productos, revisa tu pedido y confirma la venta."
         icon="utensils"
         actions={
           <motion.button whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} onClick={openHistory} className="h-11 rounded-xl border border-white/15 bg-white/10 px-4 text-[10px] font-extrabold text-white backdrop-blur hover:bg-white/15">
@@ -358,56 +345,7 @@ export function SalesView() {
 
       <section className="mt-6 grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className={selectedMenu ? "fixed inset-0 z-[60] space-y-5 overflow-y-auto bg-[#f7f2ea] p-4 pb-40 sm:p-6 xl:pr-[420px]" : "space-y-5"}>
-          <div className={`rounded-[24px] border border-white bg-white/95 p-5 shadow-[0_18px_45px_rgba(47,93,80,.09)] ${selectedMenu ? "hidden" : ""}`}>
-            <div className="flex items-end justify-between">
-              <div>
-                <span className="text-[9px] font-extrabold uppercase tracking-[.16em] text-[var(--brand-primary)]">01 · Menú</span>
-                <h2 className="mt-1 text-lg font-extrabold text-[var(--brand-ink)]">¿Qué deseas agregar?</h2>
-              </div>
-              <span className="text-[10px] text-[#87918b]">Menú o producto suelto</span>
-            </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              {catalog?.menus.map((menu) => {
-                const active = selectedMenuId === menu.id;
-                return (
-                  <button key={menu.id} onClick={() => chooseMenu(menu.id)} className={`rounded-2xl border p-4 text-left transition ${active ? "border-[var(--brand-primary)] bg-[var(--brand-soft)] ring-2 ring-[var(--brand-primary)]/10" : "border-[var(--brand-border)] bg-[var(--brand-background)] hover:border-[#f2b544]"}`}>
-                    <DishImage name={menu.name} source="/api/images/demo/food" />
-                    <strong className="mt-4 block text-sm">{menu.name}</strong>
-                    <span className="mt-1 block text-[10px] leading-4 text-[var(--brand-muted)]">{menu.description}</span>
-                    <div className="mt-4 flex items-center justify-between gap-3">
-                      <strong className="text-sm text-[var(--brand-primary)]">{currency.format(menu.basePrice)}</strong>
-                      <span className="rounded-lg bg-[var(--brand-primary)] px-2.5 py-1.5 text-[9px] font-extrabold text-white">
-                        <Icon name="plus" className="mr-1.5" />Configurar menú
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
-              <button
-                onClick={() => {
-                  setSelectedMenuId(null);
-                  setEditingMenuKey(null);
-                  setSelections({});
-                  setMenuQuantity(1);
-                  setShowIndividualProducts(true);
-                }}
-                className={`rounded-2xl border p-4 text-left transition ${showIndividualProducts ? "border-[var(--brand-secondary)] bg-[#fbf0f4] ring-2 ring-[var(--brand-secondary)]/10" : "border-[var(--brand-border)] bg-[var(--brand-background)] hover:border-[#f2b544]"}`}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="grid size-10 place-items-center rounded-xl bg-[var(--brand-secondary)] text-white"><Icon name="basket-shopping" /></div>
-                  {showIndividualProducts && <Icon name="circle-check" className="text-[var(--brand-secondary)]" />}
-                </div>
-                <strong className="mt-4 block text-sm">Producto individual</strong>
-                <span className="mt-1 block text-[10px] leading-4 text-[var(--brand-muted)]">Vende proteínas, agregados, ensaladas, postres, bebidas o extras por separado.</span>
-                <div className="mt-4 flex items-center justify-between gap-3">
-                  <strong className="text-sm text-[var(--brand-secondary)]">{catalog?.additionalProducts.length ?? 0} opciones</strong>
-                  <span className="rounded-lg bg-[var(--brand-secondary)] px-2.5 py-1.5 text-[9px] font-extrabold text-white">
-                    <Icon name="plus" className="mr-1.5" />Ver productos
-                  </span>
-                </div>
-              </button>
-            </div>
-          </div>
+          {!selectedMenu && catalog && <SalesProductCatalog catalog={catalog} quantities={extras} onMenu={chooseMenu} onQuantity={changeExtra} />}
 
           {selectedMenu && (
             <div className="overflow-hidden rounded-[24px] border border-[#f0d8a4] bg-[linear-gradient(145deg,#fffaf0,#fff3dc)] p-4 shadow-[0_16px_35px_rgba(161,113,25,.08)] sm:p-5">
@@ -480,7 +418,7 @@ export function SalesView() {
                     {extraCount > 0 ? `${includedQuantity} incluidas · ${extraCount} extra` : `${selectedCount}/${includedQuantity} incluidas`}
                   </span>
                 </div>
-                <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
                   {section.options.map((option) => {
                     const optionQuantity = sectionSelections[option.id] ?? 0;
                     const active = optionQuantity > 0;
@@ -545,71 +483,7 @@ export function SalesView() {
             </div>
           )}
 
-          {showIndividualProducts && <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-labelledby="individual-products-title">
-            <button className="absolute inset-0 bg-[#34251d]/35 backdrop-blur-[3px]" onClick={() => setShowIndividualProducts(false)} aria-label="Cerrar productos individuales" />
-            <div className="relative flex max-h-[88dvh] w-full max-w-3xl flex-col overflow-hidden rounded-t-[30px] border border-white bg-[var(--brand-background)] shadow-[0_-20px_60px_rgba(58,39,26,.22)] sm:rounded-[30px]">
-              <div className="mx-auto mt-2 h-1 w-12 shrink-0 rounded-full bg-[#ddd2c5] sm:hidden" />
-              <div className="flex items-start justify-between gap-4 border-b border-[var(--brand-border)] p-5">
-                <div>
-                  <span className="text-[9px] font-extrabold uppercase tracking-[.16em] text-[var(--brand-secondary)]">Venta directa</span>
-                  <h2 id="individual-products-title" className="mt-1 text-lg font-extrabold">Productos individuales</h2>
-                  <p className="mt-1 text-[10px] text-[#7c8580]">También puedes vender una proteína, agregado, ensalada, postre, bebida o extra sin incluir un menú.</p>
-                </div>
-                <button className="grid size-10 shrink-0 place-items-center rounded-xl bg-[var(--brand-soft)] text-[#615951]" onClick={() => setShowIndividualProducts(false)} aria-label="Cerrar"><Icon name="xmark" /></button>
-              </div>
-              <div className="flex shrink-0 gap-2 overflow-x-auto border-b border-[var(--brand-border)] bg-white px-5 py-3 [scrollbar-width:none]">
-                <button
-                  onClick={() => setIndividualCategory("")}
-                  className={`shrink-0 rounded-full px-3 py-2 text-[9px] font-extrabold transition ${individualCategory === "" ? "bg-brand text-white shadow-sm" : "bg-[#f7f2ec] text-muted"}`}
-                >
-                  Todos · {catalog?.additionalProducts.length ?? 0}
-                </button>
-                {productGroups.map((group) => {
-                  const slug = group.products[0]?.categorySlug ?? "";
-                  return (
-                    <button
-                      key={slug}
-                      onClick={() => setIndividualCategory(slug)}
-                      className={`shrink-0 rounded-full px-3 py-2 text-[9px] font-extrabold transition ${individualCategory === slug ? "bg-brand text-white shadow-sm" : "bg-[#f7f2ec] text-muted"}`}
-                    >
-                      {group.name} · {group.products.length}
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="flex-1 space-y-5 overflow-y-auto p-5">
-                {filteredProductGroups.map((group) => (
-                  <div key={group.name}>
-                    <h3 className="mb-2 text-[9px] font-extrabold uppercase tracking-[.14em] text-[var(--brand-muted)]">{group.name}</h3>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {group.products.map((product) => {
-                        const quantity = extras[product.id] ?? 0;
-                        return (
-                          <article key={product.id} className={`flex min-w-0 flex-col rounded-2xl border p-3 transition ${quantity > 0 ? "border-[var(--brand-primary)] bg-[var(--brand-soft)] shadow-sm" : "border-[var(--brand-border)] bg-[#fcfaf7]"}`}>
-                            <div className="min-w-0 flex-1">
-                              <DishImage productId={product.id} name={product.name} source={`/api/images/demo/${product.categorySlug === "postres" ? "fruit" : "food"}`} />
-                              <strong className="block text-sm leading-5">{product.name}</strong>
-                              <span className="mt-1 block text-sm font-bold text-[var(--brand-primary)]">{currency.format(product.price)}</span>
-                            </div>
-                            <div className="mt-4 flex items-center justify-between gap-3 border-t border-[var(--brand-border)] pt-3">
-                              <button className="grid size-11 place-items-center rounded-xl bg-white text-[#637068] shadow-sm disabled:opacity-30" disabled={quantity === 0} onClick={() => changeExtra(product.id, -1, product.stock)} aria-label={`Quitar ${product.name}`}><Icon name="minus" /></button>
-                              <span className="text-center"><strong className="block text-sm">{quantity}</strong><span className="text-[10px] text-[var(--brand-muted)]">{product.stock < 1 ? "Agotado" : "Cantidad"}</span></span>
-                              <button className="grid size-11 place-items-center rounded-xl bg-[var(--brand-primary)] text-white shadow-sm disabled:opacity-30" disabled={quantity >= product.stock} onClick={() => changeExtra(product.id, 1, product.stock)} aria-label={`Agregar ${product.name}`}><Icon name="plus" /></button>
-                            </div>
-                          </article>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="border-t border-[var(--brand-border)] bg-white p-4">
-                <button className="h-12 w-full rounded-xl bg-[var(--brand-secondary)] text-xs font-extrabold text-white shadow-[0_10px_24px_rgba(154,73,101,.22)]" onClick={() => setShowIndividualProducts(false)}>
-                  <Icon name="check" className="mr-2" />Listo, continuar con el pedido
-                </button>
-              </div>
-            </div>
-          </div>}
+
         </div>
 
         {historyOpen && (
@@ -686,7 +560,7 @@ export function SalesView() {
           </div>
         )}
 
-        {mobileSummaryOpen && summaryVisible && !showIndividualProducts && (
+        {mobileSummaryOpen && summaryVisible && (
           <button
             className="fixed inset-x-0 top-0 z-[61] bg-[#34251d]/35 backdrop-blur-[3px] xl:hidden"
             style={{ bottom: "calc(88px + env(safe-area-inset-bottom, 0px))" }}
@@ -694,7 +568,7 @@ export function SalesView() {
             aria-label="Cerrar resumen del pedido"
           />
         )}
-        {!mobileSummaryOpen && summaryVisible && !showIndividualProducts && (
+        {!mobileSummaryOpen && summaryVisible && (
           <button
             className="fixed right-4 z-[62] flex items-center gap-3 rounded-2xl bg-[var(--brand-primary)] px-4 py-3 text-left text-white shadow-[0_14px_35px_rgba(142,45,25,.30)] xl:hidden"
             style={{ bottom: "calc(96px + env(safe-area-inset-bottom, 0px))" }}
@@ -708,7 +582,7 @@ export function SalesView() {
             <span className="grid size-7 place-items-center rounded-lg bg-white text-[var(--brand-primary)]"><Icon name="chevron-up" /></span>
           </button>
         )}
-        {summaryVisible && !showIndividualProducts && <aside style={{ bottom: "calc(88px + env(safe-area-inset-bottom, 0px))" }} className={`fixed inset-x-0 z-[62] transform transition-transform duration-300 ${selectedMenu ? "xl:fixed xl:left-auto xl:right-6 xl:top-6 xl:w-[370px] xl:overflow-y-auto" : "xl:sticky xl:inset-auto xl:top-24 xl:z-auto xl:self-start"} xl:translate-y-0 ${mobileSummaryOpen ? "translate-y-0" : "pointer-events-none translate-y-full xl:pointer-events-auto"}`}>
+        {<aside style={{ bottom: "calc(88px + env(safe-area-inset-bottom, 0px))" }} className={`fixed inset-x-0 z-[62] transform transition-transform duration-300 ${selectedMenu ? "xl:fixed xl:left-auto xl:right-6 xl:top-6 xl:w-[370px] xl:overflow-y-auto" : "xl:sticky xl:inset-auto xl:top-24 xl:z-auto xl:self-start"} xl:translate-y-0 ${mobileSummaryOpen ? "translate-y-0" : "pointer-events-none translate-y-full xl:pointer-events-auto"}`}>
           <div className="flex max-h-[calc(100dvh-176px)] flex-col overflow-hidden rounded-t-[30px] border border-[var(--brand-border)] bg-[#fffdf8] text-[var(--brand-ink)] shadow-[0_-20px_60px_rgba(79,55,30,.25)] xl:max-h-none xl:rounded-[26px] xl:shadow-[0_20px_55px_rgba(79,55,30,.20)]">
             <div className="mx-auto mt-2 h-1 w-12 rounded-full bg-[#ddd2c5] xl:hidden" />
             <button
@@ -716,7 +590,7 @@ export function SalesView() {
               onClick={() => setMobileSummaryOpen(false)}
             >
               <div>
-                <span className="text-[9px] font-extrabold uppercase tracking-[.18em] text-[var(--brand-primary)]">{replacingOrder ? `Editando ${replacingOrder.orderNumber}` : "Resumen del pedido"}</span>
+                <span className="text-[9px] font-extrabold uppercase tracking-[.18em] text-[var(--brand-primary)]">{replacingOrder ? `Editando ${replacingOrder.orderNumber}` : "2. Revisa tu pedido"}</span>
                 <h2 className="mt-1 text-xl font-extrabold" aria-live="polite">Total {currency.format(summaryTotal)}</h2>
               </div>
               <div className="flex items-center gap-3 xl:hidden">
@@ -731,14 +605,14 @@ export function SalesView() {
             <div className="min-h-0 overflow-y-auto xl:overflow-visible">
               <div className="max-h-64 space-y-3 overflow-y-auto p-5 text-[11px]">
                 {selectedMenu && <div className="rounded-xl border border-[#eee2d2] bg-[var(--brand-background)] p-3">
-                  <strong>{menuQuantity} × {selectedMenu.name} · {currency.format(builderPrice)}</strong>
+                  <strong>{menuQuantity} × {selectedMenu.name.replace(/buffet/gi, "Colación")} · {currency.format(builderPrice)}</strong>
                   <p className="mt-1 text-[#b9472e]">En configuración · agrega el menú antes de confirmar la venta.</p>
                   {selectedMenu.sections.flatMap(section => section.options.filter(option => (selections[section.id]?.[option.id] ?? 0) > 0).map(option => <p key={option.id} className="mt-1">{selections[section.id][option.id]} × {option.name}</p>))}
                 </div>}
                 {menuLines.filter(line => !selectedMenu || line.key !== editingMenuKey).map((line) => (
                   <div key={line.key} className="rounded-xl border border-[#eee2d2] bg-[var(--brand-background)] p-3">
                     <div className="flex items-center justify-between gap-3">
-                      <span><strong>{line.quantity} ×</strong> {line.menu.name}</span>
+                      <span><strong>{line.quantity} ×</strong> {line.menu.name.replace(/buffet/gi, "Colación")}</span>
                       <strong>{currency.format(line.totalPrice)}</strong>
                     </div>
                     <div className="mt-2 flex items-center gap-2">
@@ -749,7 +623,7 @@ export function SalesView() {
                   </div>
                 ))}
                 {catalog?.additionalProducts.filter((product) => (extras[product.id] ?? 0) > 0).map((product) => <div key={product.id} className="flex justify-between gap-4"><span>{extras[product.id]} × {product.name}</span><strong>{currency.format(product.price * extras[product.id])}</strong></div>)}
-                {!selectedMenu && !menuLines.length && !hasExtra && <p className="text-[#929992]">Configura un menú o agrega productos para comenzar.</p>}
+                {!selectedMenu && !menuLines.length && !hasExtra && <p className="text-[#929992]">Tu pedido está vacío. Pulsa + en un producto o «Armar colación». Aquí verás el detalle y el total antes de cobrar.</p>}
               </div>
               <div className="space-y-3 border-t border-[#eee2d1] bg-[var(--brand-background)] p-5">
               {replacingOrder && <p className="rounded-xl bg-[#fff0cf] p-3 text-xs">Modificas una venta existente, no creas otra. Se aplican precios y recetas actuales. Total anterior: {currency.format(replacingOrder.total)}. Cancelar descarta los cambios.</p>}

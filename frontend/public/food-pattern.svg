@@ -1,0 +1,11 @@
+<!-- Patrón vectorial original de alimentos; decorativo, local y sin recursos externos. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="160" viewBox="0 0 240 160">
+ <g fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity=".6">
+  <g transform="translate(18 20) rotate(-12 20 20)"><path d="M0 18h44c-2 18-10 24-22 24S2 36 0 18Z M8 46h28 M12 10c-7-8 6-8 0-16 M23 10c-7-8 6-8 0-16 M34 10c-7-8 6-8 0-16"/></g>
+  <g transform="translate(105 12) rotate(18 20 20)"><path d="M3 13c4-10 30-10 34 0l-5 32H8Z M4 17h32 M17 10c-3-12 8-14 9-8 M18 27l4 3 M13 36l3 2 M27 23l3 3 M25 38l3-1"/></g>
+  <g transform="translate(180 26)"><path d="M0 20c0-18 16-22 23-12 12-11 26-1 22 15-3 14-13 22-22 17C10 47 0 34 0 20Z M23 8c-1-10 6-15 13-13-1 9-6 13-13 13"/></g>
+  <g transform="translate(42 106) rotate(20)"><path d="M0 0h54L27 43Z M0 0q27-12 54 0 M10 9h34"/><circle cx="21" cy="16" r="3"/><circle cx="32" cy="25" r="3"/></g>
+  <g transform="translate(125 104) rotate(-20)"><path d="M0 10q24-25 48 0Z M0 16h48 M0 22l12 5 12-5 12 5 12-5 M0 33h48q-1 10-12 10H12Q1 43 0 33Z M16 4h1 M29 2h1"/></g>
+  <g transform="translate(210 105) rotate(20)"><path d="M0 0v16q7 10 14 0V0 M7 0v45 M28 0v45 M28 0q-12 12 0 23"/></g>
+ </g>
+</svg>

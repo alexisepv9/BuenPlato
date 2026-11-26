@@ -48,6 +48,7 @@ public final class SalesDtos {
             String name,
             String description,
             int basePrice,
+            String kind,
             List<MenuSectionResponse> sections
     ) {}
 

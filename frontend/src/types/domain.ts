@@ -76,6 +76,7 @@ export type SaleMenu = {
   name: string;
   description: string;
   basePrice: number;
+  kind: "COLACION" | "PROMOTION";
   sections: SaleSection[];
 };
 

@@ -471,6 +471,34 @@ Esta actualización requiere reiniciar el backend y recargar el frontend. No nec
 
 ### Error al guardar una preparación
 
+### Catálogo de ventas visible (26 de noviembre de 2026)
+
+**Actualización de organización:** las tarjetas se agrupan por categoría, con el
+título encima: Colación, Bebidas y las demás categorías que tengan productos
+disponibles en el catálogo de ventas. Al crear una categoría «Sándwiches» y
+asignarle productos vendibles, aparece automáticamente su sección; crear solo
+un producto llamado sándwich no crea una categoría. En pantallas amplias hay
+cuatro tarjetas por fila, y en móviles dos. Los filtros conservan estos grupos.
+El resumen está siempre presente a la derecha en escritorio, incluso vacío;
+no permite confirmar sin productos. En móvil se consulta mediante el total al
+agregar artículos. «Armar colación» abre la configuración del menú. El cambio
+Buffet → Colación es de presentación en caja, no modifica nombres históricos
+de ventas ni registros de la base de datos.
+
+Ventas muestra desde el inicio los productos individuales y la opción Buffet
+en tarjetas compactas con fotografías cuadradas. Busque por nombre o utilice
+los filtros Todos, Buffet y las categorías disponibles. Los filtros no borran
+el pedido. Use + y − para modificar cantidades de productos individuales.
+Ya no necesita abrir la ventana «Productos individuales».
+
+Pulse «Configurar menú» para entrar al submódulo Buffet, elegir sus componentes
+y guardar el menú. «Volver» descarta únicamente la configuración sin guardar;
+los productos ya agregados permanecen. Puede seguir agregando artículos al volver
+al catálogo. El resumen sigue a la derecha en escritorio; en móvil abra el total
+para consultarlo, sin interrumpir la selección de productos con cada pulsación.
+Las reglas de precio y stock no cambian. Los encabezados usan un patrón original
+de alimentos almacenado localmente, sin enlaces ni marcas de agua de terceros.
+
 ### Acceso a la demostración en Render
 
 Desde el 26 de noviembre de 2026, abra `https://buenplato-fronend.onrender.com`

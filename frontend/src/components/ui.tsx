@@ -86,6 +86,8 @@ export function PageHeader({
       transition={{ type: "spring", stiffness: 220, damping: 25 }}
       className="relative overflow-hidden rounded-[26px] border border-white/10 bg-[linear-gradient(118deg,var(--brand-primary)_0%,var(--brand-primary)_48%,var(--brand-primary)_100%)] px-5 py-5 text-white shadow-[0_18px_45px_rgba(169,70,53,.20)] sm:px-6"
     >
+      {/* Ilustración local decorativa: conserva contraste bajo el nombre y la paleta global. */}
+      <span aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[url('/food-pattern.svg')] bg-repeat opacity-20 [mask-image:linear-gradient(to_right,transparent,black)]" />
       <motion.span className="absolute -right-14 -top-20 size-52 rounded-full bg-saffron/20 blur-2xl" animate={{ scale: [1, 1.14, 1] }} transition={{ duration: 7, repeat: Infinity }} />
       <span className="absolute -bottom-20 left-1/2 size-40 rounded-full bg-berry/20 blur-3xl" />
       <div className="relative flex flex-col gap-5 md:flex-row md:items-center md:justify-between">

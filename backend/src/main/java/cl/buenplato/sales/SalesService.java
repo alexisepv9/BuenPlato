@@ -33,7 +33,7 @@ public class SalesService {
     @Transactional(readOnly = true)
     public SalesCatalogResponse catalog() {
         List<MenuResponse> menus = jdbc.query("""
-                SELECT id, name, description, base_price
+                SELECT id, name, description, base_price, menu_kind
                 FROM menus
                 WHERE active = TRUE
                   AND (available_from IS NULL OR available_from <= CURRENT_DATE)
@@ -46,6 +46,7 @@ public class SalesService {
                     rs.getString("name"),
                     rs.getString("description"),
                     rs.getInt("base_price"),
+                    rs.getString("menu_kind"),
                     sections(menuId)
             );
         });
@@ -392,14 +393,14 @@ public class SalesService {
             Map<Long, BigDecimal> stockRequirements
     ) {
         MenuBase menu = jdbc.query("""
-                        SELECT id, name, base_price
+                        SELECT id, name, base_price, menu_kind
                         FROM menus
                         WHERE id = ? AND active = TRUE
                           AND (available_from IS NULL OR available_from <= CURRENT_DATE)
                           AND (available_to IS NULL OR available_to >= CURRENT_DATE)
                         """,
                 rs -> rs.next()
-                        ? new MenuBase(rs.getLong("id"), rs.getString("name"), rs.getInt("base_price"))
+                        ? new MenuBase(rs.getLong("id"), rs.getString("name"), rs.getInt("base_price"), rs.getString("menu_kind"))
                         : null,
                 menuId
         );
@@ -429,7 +430,7 @@ public class SalesService {
                 rs.getInt("maximum_selections")
         ), menuId);
 
-        int totalPrice = menu.basePrice() * quantity;
+        int totalPrice = checkedPrice((long) menu.basePrice() * quantity);
         int totalCost = 0;
         List<Map<String, Object>> snapshots = new ArrayList<>();
         Set<Long> validSections = new HashSet<>();
@@ -455,7 +456,10 @@ public class SalesService {
                 includedRemaining -= includedForOption;
                 // La cantidad multiplica el menú y su consumo de inventario, no los recargos
                 // elegidos en una única configuración de la línea de venta.
-                totalPrice += option.extraPrice() * requestedOption.quantity() + option.price() * extraUnits;
+                // Promociones replican todos sus componentes y recargos por unidad comprada.
+                // Colaciones mantienen la regla histórica de recargos por configuración.
+                int multiplier = "PROMOTION".equals(menu.kind()) ? quantity : 1;
+                totalPrice = checkedPrice((long) totalPrice + ((long) option.extraPrice() * requestedOption.quantity() + (long) option.price() * extraUnits) * multiplier);
                 totalCost += option.unitCost() * requestedOption.quantity() * quantity;
                 stockRequirements.merge(
                         option.productId(),
@@ -678,7 +682,13 @@ public class SalesService {
         return value;
     }
 
-    private record MenuBase(long id, String name, int basePrice) {}
+    /** Impide que un importe fuera de rango termine negativo por desbordamiento. */
+    private int checkedPrice(long price) {
+        if (price < 0 || price > Integer.MAX_VALUE) throw new IllegalArgumentException("El importe supera el máximo permitido por venta.");
+        return (int) price;
+    }
+
+    private record MenuBase(long id, String name, int basePrice, String kind) {}
     private record SectionRule(long id, String label, int minimum, int maximum) {}
     private record SelectedOption(long id, long productId, String name, int price, int extraPrice, int unitCost) {}
     private record MenuSnapshot(

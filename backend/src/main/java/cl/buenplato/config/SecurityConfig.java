@@ -57,8 +57,10 @@ public class SecurityConfig {
                                     "/v3/api-docs/**"
                             ).permitAll()
                             // Administración de bodega, preparaciones y finanzas:
+                            .requestMatchers(HttpMethod.GET, "/api/menus/*/photo").hasAnyRole("ADMIN", "CASHIER")
+                            .requestMatchers("/api/menus/**").hasRole("ADMIN")
                             // la regla vive en backend para que no pueda eludirse desde el navegador.
-                            .requestMatchers("/api/ingredients/**", "/api/recipes/**", "/api/finance/**")
+                            .requestMatchers("/api/menu-configurations", "/api/menu-configurations/**", "/api/ingredients/**", "/api/recipes/**", "/api/finance/**")
                             .hasRole("ADMIN")
                             .requestMatchers(HttpMethod.PUT, "/api/products/*/recipe").hasRole("ADMIN")
                             .requestMatchers(HttpMethod.POST, "/api/products/**").hasRole("ADMIN")

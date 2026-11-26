@@ -7,6 +7,7 @@ import { BrandedLoader } from "./components/ui";
 import { LoginView } from "./features/auth/LoginView";
 import { AppShell } from "./components/AppShell";
 import { RawInventoryView } from "./features/inventory/RawInventoryView";
+import { ProductsWorkspace } from "./features/catalog/ProductsWorkspace";
 import { ProductFormDialog } from "./features/catalog/ProductFormDialog";
 import { SalesView } from "./features/sales/SalesView";
 import { FinanceView } from "./features/finance/FinanceView";
@@ -142,7 +143,7 @@ export default function App() {
             ) : view === "finance" ? (
               <FinanceView />
             ) : view === "ingredients" || view === "products" ? (
-              <RawInventoryView
+              <ProductsWorkspace key={view} enabled={view === "products" && authUser.role === "ADMIN"} categories={categories}><RawInventoryView
                 key={view}
                 section={view === "ingredients" ? "ingredients" : "recipes"}
                 ingredients={ingredients}
@@ -156,7 +157,7 @@ export default function App() {
                 onSearch={setSearch}
                 onStatus={setStatusFilter}
                 onChanged={inventoryChanged}
-              />
+              /></ProductsWorkspace>
             ) : (
               <ProductFormDialog product={null} categories={categories} ingredients={ingredients} onClose={() => navigate("products")} onSaved={() => { navigate("products"); inventoryChanged("Producto guardado correctamente."); }} />
             )}
