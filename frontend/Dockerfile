@@ -8,6 +8,8 @@ RUN npm run build
 
 # Etapa 2: Nginx sirve React y redirige /api al backend.
 FROM nginx:1.27-alpine
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Permite elegir la configuración: nginx.conf en local y nginx.render.conf en Render.
+ARG NGINX_CONF=nginx.conf
+COPY ${NGINX_CONF} /etc/nginx/conf.d/default.conf
 COPY --from=build /workspace/dist /usr/share/nginx/html
 EXPOSE 80

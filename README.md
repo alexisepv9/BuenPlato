@@ -51,6 +51,7 @@ La consola H2 solo está habilitada en desarrollo local. Docker utiliza PostgreS
 - [Manual de usuario](MANUAL_DE_USUARIO.md)
 - [Documentación técnica](DOCUMENTACION_TECNICA.md)
 - [Guía de Docker](GUIA_DOCKER.md)
+- [Despliegue en Render](DESPLIEGUE_RENDER.md)
 - [Guía del backend](GUIA_BACKEND.md)
 - [Modelo entidad-relación](MODELO_ENTIDAD_RELACION.md)
 - [Memoria del proyecto](MEMORIA_PROYECTO.md)

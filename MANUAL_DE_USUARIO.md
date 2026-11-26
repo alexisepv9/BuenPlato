@@ -437,6 +437,12 @@ La terminología coincide con las pantallas actuales y los límites relevantes e
 
 ## Categorías de insumos y retiro de SKU — 13/11/2026
 
+### Despliegue Render: error de permisos `/app/data` (14/11/2026)
+
+El Dockerfile del backend crea `/app/data` y `/app/storage` con propietario `buenplato`, el usuario que ejecuta Java. Requiere reconstruir la imagen para aplicar este permiso. Esto permite H2 local de demostración, pero no garantiza persistencia en Render: no utilice esa base para datos que deba conservar sin un disco persistente.
+
+El Blueprint `render.yaml` está diseñado para PostgreSQL: revise en Environment del backend `SPRING_PROFILES_ACTIVE=prod,docker`, `DATABASE_URL`, `POSTGRES_USER` y `POSTGRES_PASSWORD`. El entrypoint convierte la URL PostgreSQL de Render a JDBC. Una variable `SPRING_DATASOURCE_URL` con H2 puede sobrescribir la configuración y debe corregirse si se elige PostgreSQL. El perfil docker carga cuentas demo conocidas: no publique datos reales usando sus claves predeterminadas. Cambiar de H2 a PostgreSQL no migra datos existentes. No comparta valores de contraseñas ni URLs que contengan credenciales en capturas.
+
 ### Productos genéricos: formulario único de alta y edición
 
 **Eliminar producto:** pulse Eliminar en su tarjeta y confirme el nombre con **Sí, eliminar**. Cancelar o Escape cierran sin cambios mientras no se esté enviando la solicitud. Es una baja lógica: conserva ventas e insumos, pero retira el producto del catálogo y de nuevas ventas. Si falla la API, la ventana muestra el error y permite reintentar. Requiere permisos de administrador.

@@ -1,0 +1,83 @@
+# Despliegue de Buen Plato en Render.
+#
+# Render NO ejecuta compose.yaml: cada servicio de Docker Compose se traduce
+# a un recurso independiente de este Blueprint:
+#   database  -> Render Postgres
+#   backend   -> Web Service (Docker, ./backend/Dockerfile)
+#   web       -> Web Service (Docker, ./frontend/Dockerfile)
+#
+# Los tres recursos deben estar en la misma región para usar la red privada.
+# La URL pública del backend se usa en frontend/nginx.render.conf.
+#
+# Antes de desplegar, sube estos cambios a GitHub y crea el Blueprint desde
+# el dashboard de Render (New > Blueprint).
+
+services:
+  - type: web
+    name: buenplato-api
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerContext: ./backend
+    dockerfilePath: ./backend/Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      # "docker" carga datos y cuentas de demostración (admin@buenplato.cl).
+      # Para una instalación real usa solo "prod" y crea usuarios propios.
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod,docker
+      # Render entrega postgresql://usuario:clave@host:base; el entrypoint
+      # del backend la convierte a jdbc:postgresql://host:base.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: buenplato-db
+          property: connectionString
+      - key: POSTGRES_USER
+        fromDatabase:
+          name: buenplato-db
+          property: user
+      - key: POSTGRES_PASSWORD
+        fromDatabase:
+          name: buenplato-db
+          property: password
+      # Spring Boot escucha en 8080; PORT indica a Render a qué puerto enrutar.
+      - key: SERVER_PORT
+        value: "8080"
+      - key: PORT
+        value: "8080"
+      # Ajuste de memoria para el plan free (512 MB).
+      - key: JAVA_TOOL_OPTIONS
+        value: -Xms64m -Xmx320m -XX:+UseSerialGC
+      # Nginx envía el header Origin del navegador; debe estar autorizado.
+      - key: APP_CORS_ALLOWED_ORIGIN_PATTERNS
+        value: https://buenplato-web.onrender.com,http://localhost:5173,http://127.0.0.1:5173
+    # Las fotos subidas se pierden en cada reinicio si no hay disco.
+    # Los discos persistentes requieren plan pago: cambia plan a "starter"
+    # y descomenta este bloque si necesitas conservarlas.
+    # disk:
+    #   name: buenplato-storage
+    #   mountPath: /app/storage
+    #   sizeGB: 1
+
+  - type: web
+    name: buenplato-web
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerContext: ./frontend
+    dockerfilePath: ./frontend/Dockerfile
+    healthCheckPath: /healthz
+    envVars:
+      # Selecciona frontend/nginx.render.conf en tiempo de build.
+      # En Docker local se usa nginx.conf por defecto.
+      - key: NGINX_CONF
+        value: nginx.render.conf
+      # Nginx escucha en el puerto 80 dentro del contenedor.
+      - key: PORT
+        value: "80"
+
+databases:
+  - name: buenplato-db
+    plan: free
+    region: oregon
+    postgresMajorVersion: "17"
