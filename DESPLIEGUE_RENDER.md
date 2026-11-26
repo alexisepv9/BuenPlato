@@ -1,5 +1,26 @@
 # Despliegue en Render
 
+## Despliegue manual actual (26 de noviembre de 2026)
+
+- Interfaz: `https://buenplato-fronend.onrender.com`.
+- Backend: `https://buenplato.onrender.com`.
+- En el servicio frontend: raíz `frontend`, Dockerfile `./Dockerfile`,
+  contexto `.`, `NGINX_CONF=nginx.render.conf` y `PORT=80`.
+- `frontend/nginx.render.conf` reenvía `/api/` al backend anterior.
+  Después de cambiarlo, publica el commit y reconstruye el frontend.
+- Comprueba `https://buenplato-fronend.onrender.com/api/health`: debe devolver
+  JSON con `status: ok`. Un 404 con `x-render-routing: no-server` puede indicar
+  que el proxy apunta a un dominio sin servicio.
+- En el backend, autoriza el origen exacto de la interfaz mediante
+  `APP_CORS_ALLOWED_ORIGIN_PATTERNS=https://buenplato-fronend.onrender.com`;
+  conserva otros orígenes necesarios separados por comas. No uses `*`.
+- La base H2 temporal en `/tmp` no conserva datos al reemplazar la instancia;
+  no utilices este entorno para ventas reales sin almacenamiento persistente.
+
+Los pasos Blueprint de abajo describen una instalación alternativa con otros
+nombres y PostgreSQL. No crees servicios duplicados para actualizar el despliegue
+manual existente. Si usas el Blueprint, adapta el proxy al dominio asignado.
+
 Render **no ejecuta `compose.yaml`**. El archivo `compose.yaml` sirve para el
 computador local; en Render cada contenedor se convierte en un recurso
 independiente. La traducción ya está preparada en `render.yaml`:
@@ -20,7 +41,7 @@ fotos sin depender de CORS entre dominios distintos.
 - `backend/docker-entrypoint.sh`: convierte la URL de Render
   (`postgresql://...`) al formato JDBC que espera Spring Boot.
 - `frontend/nginx.render.conf`: configuración de Nginx para Render. Apunta a
-  `https://buenplato-api.onrender.com`.
+  `https://buenplato.onrender.com` en el despliegue manual actual.
 - `frontend/Dockerfile`: el argumento `NGINX_CONF` elige `nginx.conf` en local
   y `nginx.render.conf` en Render.
 

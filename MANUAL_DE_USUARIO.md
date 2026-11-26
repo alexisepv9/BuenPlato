@@ -471,6 +471,18 @@ Esta actualización requiere reiniciar el backend y recargar el frontend. No nec
 
 ### Error al guardar una preparación
 
+### Acceso a la demostración en Render
+
+Desde el 26 de noviembre de 2026, abra `https://buenplato-fronend.onrender.com`
+para acceder a la interfaz. La dirección `https://buenplato.onrender.com` es
+del backend y no es la pantalla de inicio. Si aparece «Not Found» al iniciar
+sesión, informe al administrador: debe comprobar la conexión del frontend con
+la API mediante `/api/health`, sin desactivar la autenticación. La configuración
+de Nginx requiere reconstruir el frontend después de publicar cambios.
+Este entorno usa almacenamiento temporal para H2: no registre ventas reales
+ni dependa de él para conservar información. Cambie las cuentas de demostración
+antes de usar datos reales.
+
 ### Fotos locales en productos y preparaciones
 
 La vista previa muestra primero el archivo seleccionado, después la foto propia guardada. En productos existentes sin foto propia puede mostrar la misma imagen de ejemplo local del catálogo, identificada como **Foto de ejemplo local**. Si tampoco puede cargarla, indica **Sin foto disponible**; si falla un archivo recién seleccionado, informa el error sin sustituirlo por una foto de ejemplo. Seleccionar un archivo no lo guarda hasta confirmar el formulario.
