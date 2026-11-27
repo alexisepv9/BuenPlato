@@ -13,7 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class MenuConfigurationService {
     private final JdbcTemplate jdbc;
-    public MenuConfigurationService(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    private final jakarta.validation.Validator validator;
+    public MenuConfigurationService(JdbcTemplate jdbc, jakarta.validation.Validator validator) { this.jdbc = jdbc; this.validator = validator; }
 
     public record Option(@NotNull Long productId, @Min(0) @Max(10000000) int extraPrice) {}
     public record Section(@NotNull Long categoryId, @NotBlank @Size(max=100) String label,
@@ -44,29 +45,40 @@ public class MenuConfigurationService {
 
     /** Valida pertenencia y vigencia antes de tocar filas; una sección representa una categoría. */
     private void validate(Configuration c) {
+        if (c == null) throw new IllegalArgumentException("Completa los datos de la promoción.");
+        var violations = validator.validate(c);
+        if (!violations.isEmpty()) throw new IllegalArgumentException("Revisa los campos de la promoción: " + violations.iterator().next().getMessage());
         if (c.availableFrom()!=null && c.availableTo()!=null && c.availableFrom().isAfter(c.availableTo()))
             throw new IllegalArgumentException("La fecha final no puede ser anterior a la inicial.");
         Set<Long> categories = new HashSet<>();
         boolean mandatory = false;
+        int position = 0;
         for (Section s : c.sections()) {
+            position++;
+            String group = "Grupo de productos " + position + ": ";
+            if (jdbc.queryForObject("SELECT COUNT(*) FROM categories WHERE id=? AND active=TRUE",Integer.class,s.categoryId())!=1)
+                throw new IllegalArgumentException(group + "selecciona una categoría activa.");
             if (!categories.add(s.categoryId()) || s.minimum()>s.included())
-                throw new IllegalArgumentException("No repitas categorías y usa un mínimo menor o igual a las unidades incluidas.");
+                throw new IllegalArgumentException(group + "no repitas categorías y revisa la cantidad por oferta.");
             mandatory |= s.minimum()>0;
             Set<Long> products = new HashSet<>();
             for (Option o : s.options()) {
                 if (!products.add(o.productId()) || jdbc.queryForObject("SELECT COUNT(*) FROM products p JOIN categories c ON c.id=p.category_id WHERE p.id=? AND p.category_id=? AND p.active=TRUE AND c.active=TRUE",Integer.class,o.productId(),s.categoryId())!=1)
-                    throw new IllegalArgumentException("Cada opción debe ser un producto activo de su categoría, sin repetirlo.");
+                    throw new IllegalArgumentException(group + "selecciona productos activos de su categoría, sin repetirlos.");
             }
         }
-        if (!mandatory) throw new IllegalArgumentException("Agrega al menos una sección obligatoria para evitar vender una oferta vacía.");
+        if (!mandatory) throw new IllegalArgumentException("Al menos un grupo de productos debe ser obligatorio. Desmarca «El cliente puede omitir estos productos» en uno de los grupos.");
     }
 
     /** Crea o reemplaza la configuración atómicamente; conserva la identidad y los snapshots históricos. */
     @Transactional
     public long save(Long id, Configuration c) {
         validate(c);
-        if (jdbc.queryForObject("SELECT COUNT(*) FROM menus WHERE LOWER(name)=LOWER(?) AND (? IS NULL OR id<>?)",
-                Integer.class,c.name().trim(),id,id)>0)
+        // Consultas separadas: PostgreSQL no puede inferir el tipo de un parámetro NULL en «? IS NULL».
+        int duplicates = id == null
+            ? jdbc.queryForObject("SELECT COUNT(*) FROM menus WHERE LOWER(name)=LOWER(?)",Integer.class,c.name().trim())
+            : jdbc.queryForObject("SELECT COUNT(*) FROM menus WHERE LOWER(name)=LOWER(?) AND id<>?",Integer.class,c.name().trim(),id);
+        if (duplicates>0)
             throw new IllegalArgumentException("Ya existe una oferta con ese nombre. Usa otro nombre o edita la existente.");
         if (id==null) {
             id = insert("INSERT INTO menus(name,description,menu_kind,base_price,available_from,available_to,active) VALUES (?,?,?,?,?,?,?)",

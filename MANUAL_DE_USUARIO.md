@@ -1,5 +1,56 @@
 # Manual de usuario — Buen Plato
 
+### Productos más vendidos en Finanzas
+
+Seleccione Desde y Hasta para consultar los diez productos con más unidades vendidas.
+Las barras y cantidades separan ventas directas de productos incluidos en colaciones
+y promociones. Tres promociones de dos completos cuentan como seis completos, no
+como tres productos ni nueve. Las ventas anuladas no se incluyen. El ranking se
+consulta nuevamente al entrar a Finanzas o cambiar las fechas; no es una transmisión
+en tiempo real. La tabla de rentabilidad y sus exportaciones siguen siendo un análisis
+separado: no se reparte arbitrariamente el precio de una promoción entre sus productos.
+Este cambio requiere actualizar tanto backend como frontend.
+
+**Validaciones al guardar promociones:** complete nombre, precio entero y al
+menos un grupo con productos seleccionados. No repita categorías. La cantidad
+por oferta admite de 1 a 100 unidades; precio y recargos de $0 a $10.000.000.
+Al menos un grupo debe ser obligatorio y la fecha final no puede ser anterior
+a la inicial. Los errores se muestran dentro de la ventana sin borrar los datos.
+Si ocurre un problema de base de datos, comparta la referencia del mensaje con
+el administrador para localizar el registro, no contraseñas. Las correcciones
+del servidor requieren reiniciar el backend local o desplegarlo en Render;
+actualizar solo el frontend no carga estos cambios.
+
+**Nombre de los grupos de una promoción:** ya no se solicita «Título para el
+cliente». Al seleccionar la categoría, se utiliza su nombre como título
+(por ejemplo, Completos o Bebestibles). Al guardar una oferta antigua desde
+este formulario, sus títulos se actualizan con los nombres de sus categorías.
+No cambia el nombre de la promoción ni el detalle histórico de ventas guardadas.
+
+**Productos de una promoción:** el formulario usa «Productos de la oferta» y
+«Agregar productos», en lugar de «secciones». Cada grupo permite elegir una
+categoría, productos y cantidad; quitarlo solo lo retira de la oferta que está
+editando, no del inventario. El contenido central se desplaza con la rueda,
+el gesto táctil o el teclado cuando tiene foco; Cerrar y Guardar permanecen
+visibles. La ventana se muestra por encima de la navegación y no depende del
+desplazamiento de la página de Productos.
+
+**Ancho de Productos:** el encabezado, los filtros y las tarjetas ocupan el mismo
+ancho disponible que la pestaña Colaciones y promociones, alineados con las
+pestañas superiores. Las tarjetas conservan su tamaño compacto y se distribuyen
+según el espacio disponible. Este ajuste no cambia formularios ni existencias.
+
+## Formulario compacto de promociones
+
+En Productos → Colaciones y promociones, Crear oferta y Editar usan una sola
+columna. Nombre, tipo y precio están visibles; despliegue «Foto, descripción y
+vigencia» solo cuando necesite esos datos. Cada sección se puede plegar y muestra
+un resumen de sus unidades y opciones sin perder lo seleccionado. «Cantidad por
+oferta» reemplaza los dos campos de cantidad; puede marcar la sección como opcional.
+El encabezado y «Guardar oferta» permanecen visibles mientras desplaza el contenido.
+Si un campo obligatorio está incompleto, su panel se abre para corregirlo.
+Plegar un panel no guarda ni borra datos. Las reglas de venta y stock no cambian.
+
 Si una pestaña abierta antes de actualizar sigue mostrando error 415 al subir una
 foto, recárgala antes de reintentar. El cliente HTTP ya no impone JSON a todos los
 envíos y el documento inicial evita caché para cargar la versión actual del sistema.

@@ -19,9 +19,11 @@ import java.util.Locale;
 @Transactional(readOnly = true)
 public class FinanceService {
     private final JdbcTemplate jdbc;
+    private final ProductDemandService productDemand;
 
-    public FinanceService(JdbcTemplate jdbc) {
+    public FinanceService(JdbcTemplate jdbc, ProductDemandService productDemand) {
         this.jdbc = jdbc;
+        this.productDemand = productDemand;
     }
 
     public DashboardResponse dashboard(LocalDate requestedFrom, LocalDate requestedTo) {
@@ -160,6 +162,7 @@ public class FinanceService {
 
         return new DashboardResponse(
                 from, to, metrics, daily, paymentMethods, categories, topItems,
+                productDemand.ranking(from, to),
                 hourlySales, expenseRows, stockRisks, insights(metrics, topItems, hourlySales, stockRisks)
         );
     }

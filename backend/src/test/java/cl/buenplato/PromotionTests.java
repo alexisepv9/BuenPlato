@@ -31,6 +31,7 @@ class PromotionTests {
     @Autowired InventoryService inventory;
     @Autowired JdbcTemplate jdbc;
     @Autowired WebApplicationContext context;
+    @Autowired cl.buenplato.finance.ProductDemandService demand;
     long category,product;
 
     @BeforeEach void fixture() {
@@ -52,17 +53,39 @@ class PromotionTests {
         assertThat(sales.catalog().menus()).anyMatch(m->m.id()==id && m.kind().equals("PROMOTION"));
         var order=sales.createOrder(request(id,3,2));
         assertThat(order.total()).isEqualTo(15600);
+        var ranked = demand.ranking(LocalDate.now(), LocalDate.now()).stream()
+                .filter(item -> item.productId() == product).findFirst().orElseThrow();
+        assertThat(ranked.quantity()).isEqualTo(6);
+        assertThat(ranked.offerQuantity()).isEqualTo(6);
+        assertThat(ranked.directQuantity()).isZero();
         assertThat(jdbc.queryForObject("SELECT stock FROM products WHERE id=?",BigDecimal.class,product)).isEqualByComparingTo("14");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM inventory_movements WHERE order_id=?",Integer.class,order.id())).isEqualTo(1);
         offers.deactivate(id);
         assertThat(sales.catalog().menus()).noneMatch(m->m.id()==id);
         assertThat(sales.orderHistory()).anyMatch(o->o.id().equals(order.id()) && o.total()==15600);
+        jdbc.update("UPDATE orders SET status='CANCELLED' WHERE id=?", order.id());
+        assertThat(demand.ranking(LocalDate.now(), LocalDate.now())).noneMatch(item -> item.productId() == product);
     }
     @Test void preservesColacionPricingAndChargesAdditionalUnitsInPromotions() {
         long colacion=offers.save(null,config("COLACION",null,null));
         assertThat(sales.createOrder(request(colacion,2,2)).total()).isEqualTo(10200);
         long promo=offers.save(null,config("PROMOTION",null,null));
         assertThat(sales.createOrder(request(promo,2,3)).total()).isEqualTo(16600);
+    }
+
+    /** La demanda suma ambos canales sin duplicar la oferta ni mezclar el filtro de fechas. */
+    @Test void demandCombinesDirectSalesAndOffers() {
+        long id = offers.save(null, config("PROMOTION", null, null));
+        sales.createOrder(request(id, 3, 2));
+        sales.createOrder(new CreateOrderRequest(List.of(), List.of(new ExtraItem(product, 2)),
+                null, "TAKEAWAY", "CASH", null));
+        var item = demand.ranking(LocalDate.now(), LocalDate.now()).stream()
+                .filter(row -> row.productId() == product).findFirst().orElseThrow();
+        assertThat(item.directQuantity()).isEqualTo(2);
+        assertThat(item.offerQuantity()).isEqualTo(6);
+        assertThat(item.quantity()).isEqualTo(8);
+        assertThat(demand.ranking(LocalDate.now().minusDays(2), LocalDate.now().minusDays(1)))
+                .noneMatch(row -> row.productId() == product);
     }
     @Test void recipeConsumesIngredientsNotBothStocks() {
         var ingredient=inventory.createIngredient(new IngredientRequest(1L,"Pan QA promo","UNIT",new BigDecimal("20"),BigDecimal.ONE,BigDecimal.ONE,null));
@@ -89,6 +112,19 @@ class PromotionTests {
         long id=offers.save(null,config("PROMOTION",null,null));
         assertThatThrownBy(()->sales.createOrder(request(id,1,1))).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(()->sales.createOrder(request(id,11,2))).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Stock insuficiente");
+    }
+    @Test void rejectsDuplicateNamesWithoutDatabaseError() {
+        var draft=config("PROMOTION",null,null);
+        long id=offers.save(null,draft);
+        offers.save(id,draft); // Editar el mismo nombre no debe contarse como duplicado.
+        assertThatThrownBy(()->offers.save(null,draft)).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Ya existe");
+    }
+    @Test void rejectsEmptyProductsAndAllOptionalGroups() {
+        var empty=new Configuration("Vacía","","PROMOTION",100,null,null,true,0,List.of());
+        assertThatThrownBy(()->offers.save(null,empty)).isInstanceOf(IllegalArgumentException.class);
+        var optional=new Configuration("Opcional","","PROMOTION",100,null,null,true,0,
+            List.of(new Section(category,"Completos",0,1,List.of(new Option(product,0)))));
+        assertThatThrownBy(()->offers.save(null,optional)).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("obligatorio");
     }
     @Test void adminOnlyManagementAndValidatedHttpContract() throws Exception {
         var mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();

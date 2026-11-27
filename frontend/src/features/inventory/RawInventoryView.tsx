@@ -147,7 +147,8 @@ export function RawInventoryView({ section, ingredients, products, categories, l
     }
   }
 
-  return <div className="mx-auto max-w-[1380px]">
+  // Productos comparte el ancho del contenedor de pestañas; Insumos conserva su disposición.
+  return <div className={section === "recipes" ? "w-full min-w-0" : "mx-auto max-w-[1380px]"}>
     {showCategories && <IngredientCategoriesDialog categories={ingredientCategories} onClose={() => setShowCategories(false)} onChanged={items => { setIngredientCategories(items); setCategoryFilter(""); onChanged("Categorías actualizadas."); }} />}
     <FloatingAlert message={success} tone="success" />
     <FloatingAlert message={actionError} />

@@ -161,6 +161,7 @@ export type FinanceDashboard = {
   paymentMethods: { label: string; amount: number; percentage: number }[];
   categories: { label: string; amount: number; percentage: number }[];
   topItems: { name: string; quantity: number; revenue: number; cost: number; contribution: number }[];
+  bestSellingProducts: { productId: number; name: string; directQuantity: number; offerQuantity: number; quantity: number }[];
   hourlySales: { hour: number; revenue: number; orders: number }[];
   expenses: { id: number; date: string; category: string; description: string; type: string; amount: number; paymentMethod: string }[];
   stockRisks: { productId: number; name: string; stock: number; threshold: number; inventoryValue: number }[];

@@ -5,6 +5,7 @@ import { apiClient, apiErrorMessage } from "../../lib/api";
 import type { FinanceDashboard } from "../../types/domain";
 import { currency, fieldClass } from "../../lib/presentation";
 import { Icon, FloatingAlert, BrandedLoader, PageHeader } from "../../components/ui";
+import { BestSellingProducts } from "./BestSellingProducts";
 
 /** Presenta métricas financieras del backend y genera reportes PDF/Excel. */
 export function FinanceView() {
@@ -115,6 +116,8 @@ export function FinanceView() {
             <div className="mt-5 flex h-40 items-end gap-2">{dashboard.hourlySales.length ? dashboard.hourlySales.map((hour) => <div key={hour.hour} className="flex flex-1 flex-col items-center justify-end gap-2"><div className="w-full rounded-t-md bg-[#4c93a6]" style={{ height: `${Math.max(7, hour.revenue / maxHourly * 105)}px` }} /><span className="text-[8px] text-[#8a928d]">{String(hour.hour).padStart(2, "0")}h</span></div>) : <p className="m-auto text-xs text-[#949b96]">Sin datos horarios.</p>}</div>
           </article>
         </section>
+
+        <BestSellingProducts products={dashboard.bestSellingProducts ?? []} />
 
         <section className="mt-5 overflow-hidden rounded-[24px] border border-[var(--brand-border)] bg-white">
           <div className="flex flex-col gap-3 border-b border-[var(--brand-border)] p-5 sm:flex-row sm:items-center sm:justify-between">

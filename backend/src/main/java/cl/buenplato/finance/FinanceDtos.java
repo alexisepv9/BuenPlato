@@ -22,6 +22,7 @@ public final class FinanceDtos {
             List<Breakdown> paymentMethods,
             List<Breakdown> categories,
             List<TopItem> topItems,
+            List<ProductDemand> bestSellingProducts,
             List<HourlySale> hourlySales,
             List<ExpenseRow> expenses,
             List<StockRisk> stockRisks,
@@ -50,6 +51,8 @@ public final class FinanceDtos {
     public record DailySale(LocalDate date, long revenue, long orders) {}
     public record Breakdown(String label, long amount, double percentage) {}
     public record TopItem(String name, long quantity, long revenue, long cost, long contribution) {}
+    /** Cantidades físicas: venta directa y componentes de ofertas, sin repartir ingresos ficticios. */
+    public record ProductDemand(long productId, String name, long directQuantity, long offerQuantity, long quantity) {}
     public record HourlySale(int hour, long revenue, long orders) {}
     public record StockRisk(long productId, String name, double stock, double threshold, long inventoryValue) {}
     public record ExpenseRow(long id, LocalDate date, String category, String description, String type, long amount, String paymentMethod) {}
