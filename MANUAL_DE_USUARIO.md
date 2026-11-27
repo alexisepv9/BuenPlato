@@ -1,5 +1,58 @@
 # Manual de usuario — Buen Plato
 
+### Revisión final antes de registrar una venta
+
+Al pulsar **Confirmar** en el resumen derecho se abre una ventana con productos,
+colaciones/promociones y su composición, cantidades, importes, total, cliente,
+medio de pago, tipo de entrega y notas para cocina. Abrirla no guarda la venta.
+**Volver y revisar** (o Escape) conserva el pedido para corregirlo. Solo **Sí,
+registrar venta** envía el pedido. Al modificar el contenido de una venta existente,
+la confirmación dice **Sí, guardar cambios**.
+
+Durante el envío los botones quedan bloqueados. Si falla, el detalle y el error
+permanecen en la ventana; ante errores de conexión revise el historial antes de
+reintentar para evitar duplicados. En celular, el detalle se desplaza dentro de
+la ventana y el total y los botones permanecen visibles por encima del menú.
+
+### Tarjetas y mensajes de solicitudes
+
+Las vistas comparten un contenedor centrado de hasta 1.200 px: títulos, filtros y
+listados mantienen sus bordes alineados, sin una franja vacía a la derecha.
+Productos, promociones, opciones de colación e insumos usan la misma regla de
+cuadrícula, con un máximo de cinco tarjetas por fila y fotos cuadradas en insumos.
+El ancho de las tarjetas se adapta al espacio disponible. En pantallas pequeñas
+o junto al resumen de Venta aparecen menos columnas; los resultados filtrados
+conservan el ancho de columna en lugar de estirar una tarjeta a toda la fila.
+
+Un error de login permanece visible en el formulario. Los errores de solicitudes
+indican una causa orientativa, estado HTTP y referencia para soporte, sin mostrar
+HTML de Render ni trazas internas. Un 401 al ingresar indica credenciales rechazadas;
+un 502 indica indisponibilidad del servicio, no contraseña incorrecta. Si un guardado
+falla por conexión o error del servidor, revise el listado antes de repetirlo: no se
+puede asegurar desde el navegador si alcanzó a registrarse. Comparta la referencia
+y hora con el administrador para consultar los logs del backend.
+
+### Pantalla inicial
+
+El sistema abre siempre en **Venta** al iniciar sesión, abrir la aplicación o
+recargar la página, también para administradores con sesión vigente. Después
+puede navegar a las demás opciones disponibles según sus permisos.
+
+### Tema general Donde Mezy
+
+Como administrador, abra **Configuración → Tema general**, seleccione **Donde Mezy**
+y revise la vista previa. Pulse **Guardar configuración** para aplicar la selección
+al sistema y conservarla en la base de datos. **Descartar cambios** restaura la opción
+guardada. La paleta usa amarillo vivo y blanco como colores predominantes,
+texto oscuro sobre amarillo y navegación clara; no cambia el nombre
+ni el logo automáticamente. Las otras sesiones reciben el tema al recuperar foco
+o en aproximadamente 30 segundos. Para disponer de esta opción en Render se deben
+desplegar frontend y backend. No requiere migración ni altera el tema actual por defecto.
+
+Si aparece «Selecciona una paleta disponible», el backend conectado no reconoce
+el nuevo tema. Actualice y reinicie ese backend (o despliegue su versión nueva en
+Render), no solo el frontend, y vuelva a guardar. No es necesario borrar datos.
+
 ### Productos más vendidos en Finanzas
 
 Seleccione Desde y Hasta para consultar los diez productos con más unidades vendidas.

@@ -50,6 +50,8 @@ export function LoginView({ onAuthenticated, notice = "" }: { onAuthenticated: (
           <p className="mt-2 text-xs leading-5 text-[#7b847f]">Ingresa con el usuario asignado al administrador o a caja.</p>
           <FloatingAlert message={notice} tone="warning" />
           <FloatingAlert message={error} />
+          {/* El error permanece visible aunque se cierre la notificación flotante. */}
+          {error && <p className="mt-4 break-words rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
           <label className="mt-6 block">
             <span className="mb-1.5 block text-[10px] font-bold text-[var(--brand-muted)]">Correo electrónico</span>
             <input className={fieldClass} type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} required />

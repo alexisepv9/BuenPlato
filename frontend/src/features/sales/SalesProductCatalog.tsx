@@ -34,7 +34,7 @@ export function SalesProductCatalog({ catalog, quantities, onMenu, onQuantity }:
     </div>
     {menuGroups.map(group => <section key={group.label} aria-label={group.label} className="mb-7">
     <h3 className="mb-3 border-b border-[var(--brand-border)] pb-2 text-base font-extrabold">{group.label}</h3>
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+    <div className="catalog-card-grid">
       {group.menus.map(menu => <button key={`menu-${menu.id}`} onClick={() => onMenu(menu.id)} className="flex min-w-0 flex-col rounded-2xl border border-[var(--brand-primary)] bg-[var(--brand-soft)] p-2.5 text-left transition hover:-translate-y-1 focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)]">
         <DishImage menuId={menu.id} name={menu.name} source="/api/images/demo/food" square />
         <span className="text-[10px] font-bold uppercase text-[var(--brand-primary)]">{menu.kind === "PROMOTION" ? "Promoción" : "Colación"} · a tu gusto</span>
@@ -46,7 +46,7 @@ export function SalesProductCatalog({ catalog, quantities, onMenu, onQuantity }:
     </section>)}
     {sections.map(section => <section key={section.slug} aria-label={section.name} className="mb-7 last:mb-0">
       <h3 className="mb-3 border-b border-[var(--brand-border)] pb-2 text-base font-extrabold">{section.name} <span className="text-xs font-normal text-[var(--brand-muted)]">({section.products.length})</span></h3>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="catalog-card-grid">
         {section.products.map(product => <SaleProductCard key={product.id} product={product} quantity={quantities[product.id] ?? 0} onQuantity={onQuantity} />)}
       </div>
     </section>)}

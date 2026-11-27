@@ -1,5 +1,6 @@
 /** Construcción del pedido buffet y productos individuales. El servidor confirma precios y descuenta existencias. */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { SaleConfirmationDialog } from "./SaleConfirmationDialog";
 import { motion } from "motion/react";
 import { SalesProductCatalog } from "./SalesProductCatalog";
 import { DishImage } from "../../components/DishImage";
@@ -28,6 +29,8 @@ export function SalesView() {
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [confirmationOpen, setConfirmationOpen] = useState(false);
+  const submittingSale = useRef(false);
   const [error, setError] = useState("");
   const [createdOrder, setCreatedOrder] = useState<CreatedOrder | null>(null);
   const [mobileSummaryOpen, setMobileSummaryOpen] = useState(false);
@@ -267,7 +270,9 @@ export function SalesView() {
   }
 
   async function createOrder() {
-    if (!canSubmit) return;
+    // Solo la revisión final autoriza el envío; el cerrojo evita dobles clics.
+    if (!confirmationOpen || !canSubmit || submittingSale.current) return;
+    submittingSale.current = true;
     setSaving(true);
     setError("");
     setCreatedOrder(null);
@@ -300,6 +305,7 @@ export function SalesView() {
       setReplacingOrder(null);
       window.dispatchEvent(new Event("buenplato:sale-changed"));
       setCreatedOrder(data);
+      setConfirmationOpen(false);
       setSelections({});
       setMenuQuantity(1);
       setMenuLines([]);
@@ -311,6 +317,7 @@ export function SalesView() {
     } catch (requestError) {
       setError(apiErrorMessage(requestError));
     } finally {
+      submittingSale.current = false;
       setSaving(false);
     }
   }
@@ -321,6 +328,12 @@ export function SalesView() {
 
   return (
     <div className="mx-auto max-w-[1600px]">
+      {confirmationOpen && <SaleConfirmationDialog
+        menus={menuLines} products={catalog?.additionalProducts ?? []} quantities={extras}
+        total={total} customer={customerName} service={serviceType} payment={paymentMethod}
+        notes={notes} editing={Boolean(replacingOrder)} saving={saving} error={error}
+        onBack={() => setConfirmationOpen(false)} onConfirm={createOrder}
+      />}
       <FloatingAlert message={createdOrder ? `Venta registrada · Pedido ${createdOrder.orderNumber} · ${currency.format(createdOrder.total)}` : ""} tone="success" />
 
       <PageHeader
@@ -418,7 +431,7 @@ export function SalesView() {
                     {extraCount > 0 ? `${includedQuantity} incluidas · ${extraCount} extra` : `${selectedCount}/${includedQuantity} incluidas`}
                   </span>
                 </div>
-                <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+                <div className="catalog-card-grid mt-4">
                   {section.options.map((option) => {
                     const optionQuantity = sectionSelections[option.id] ?? 0;
                     const active = optionQuantity > 0;
@@ -641,7 +654,7 @@ export function SalesView() {
                 </div>
                 <textarea className="min-h-20 w-full rounded-xl border border-[#e5d8c6] bg-white p-3 text-xs text-[var(--brand-ink)] outline-none placeholder:text-[#a29f98] focus:border-[var(--brand-primary)]" value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Notas para cocina" maxLength={500} />
                 {selectedMenu && !menuIsComplete && <p className="rounded-xl bg-[#fff0cf] p-3 text-[10px] leading-4 text-[#8b5b12]">Completa las cantidades obligatorias del menú antes de guardarlo.</p>}
-                <button disabled={!canSubmit} onClick={createOrder} className="h-12 w-full rounded-xl bg-[var(--brand-primary)] text-xs font-extrabold text-white shadow-[0_10px_25px_rgba(142,45,25,.25)] transition hover:bg-[#ef6a48] disabled:cursor-not-allowed disabled:opacity-40">
+                <button disabled={!canSubmit} onClick={() => { setError(""); setConfirmationOpen(true); }} className="h-12 w-full rounded-xl bg-[var(--brand-primary)] text-xs font-extrabold text-white shadow-[0_10px_25px_rgba(142,45,25,.25)] transition hover:bg-[#ef6a48] disabled:cursor-not-allowed disabled:opacity-40">
                   <Icon name={saving ? "spinner" : "check"} className={`mr-2 ${saving ? "animate-spin" : ""}`} />
                 {saving ? "Guardando venta" : `${replacingOrder ? "Guardar cambios" : "Confirmar"} · ${currency.format(total)}`}
                 </button>

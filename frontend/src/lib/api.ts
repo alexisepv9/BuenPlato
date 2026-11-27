@@ -4,6 +4,7 @@
  * y traducción de errores del backend a mensajes comprensibles.
  */
 import axios from "axios";
+import { requestErrorMessage } from "./requestError";
 
 type RequestTrace = {
   id: string;
@@ -96,28 +97,10 @@ apiClient.interceptors.response.use(
 /** Convierte fallos de transporte o negocio en mensajes aptos para la interfaz. */
 export function apiErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
-    const responseData = error.response?.data;
-    if (
-      responseData &&
-      typeof responseData === "object" &&
-      "message" in responseData &&
-      typeof responseData.message === "string"
-    ) {
-      return responseData.message;
-    }
-    if (typeof responseData === "string" && responseData.trim()) {
-      return responseData;
-    }
-    if (error.response?.status === 401) {
-      return "Tu sesión venció. Vuelve a iniciar sesión para continuar.";
-    }
-    if (error.code === "ECONNABORTED") {
-      return "La API tardó demasiado en responder. Comprueba que el backend siga ejecutándose.";
-    }
-    if (!error.response) {
-      return `No se pudo conectar con la API: ${error.message}`;
-    }
-    return `La API respondió con un error ${error.response.status}.`;
+    return requestErrorMessage(error.response?.status, error.response?.data,
+      error.config?.url ?? "", error.code,
+      error.response?.headers["x-request-id"] ?? error.response?.headers["rndr-id"] ?? error.config?.trace?.id,
+      error.config?.method);
   }
   return error instanceof Error ? error.message : "Ocurrió un error inesperado.";
 }

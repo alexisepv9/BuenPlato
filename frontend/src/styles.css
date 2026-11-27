@@ -7,6 +7,27 @@
 @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap");
 @import "tailwindcss";
 
+/* Eje compartido: cabecera, filtros y contenido mantienen los mismos márgenes. */
+.app-page-layout {
+  width: 100%;
+  max-width: 1200px;
+  min-width: 0;
+  margin-inline: auto;
+}
+
+/* Hasta cinco columnas que aprovechan el ancho disponible, incluso en paneles.
+   auto-fill conserva las columnas vacías para no agrandar el último producto.
+   El mínimo de 160 px evita botones apretados; min(100%, ...) evita desbordes. */
+.catalog-card-grid {
+  display: grid;
+  width: 100%;
+  box-sizing: border-box;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, max(160px, calc((100% - 48px) / 5))), 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+.catalog-card-grid > * { min-width: 0; overflow-wrap: anywhere; }
+
 :root {
   --brand-primary: #b9472e;
   --brand-secondary: #853951;
@@ -15,6 +36,7 @@
   --brand-border: #eadfd4;
   --brand-ink: #292b30;
   --brand-muted: #697078;
+  --brand-accent: #f2b544;
 }
 
 @theme inline {
@@ -26,7 +48,7 @@
   --color-cream: var(--brand-background);
   --color-surface: #fffdf9;
   --color-terracotta: var(--brand-primary);
-  --color-saffron: #f2b544;
+  --color-saffron: var(--brand-accent);
   --color-berry: var(--brand-secondary);
   --color-aqua: #4c93a6;
   --color-charcoal: var(--brand-ink);
@@ -43,4 +65,27 @@
   button {
     @apply cursor-pointer;
   }
+}
+
+/* Mezy: conserva la semántica de las otras paletas y evita blanco sobre amarillo.
+   Se limita a superficies de marca; las alertas mantienen sus colores propios. */
+html[data-palette="mezy"] :is(.bg-brand, .bg-terracotta, [class*="bg-[var(--brand-primary)]"], header[class*="var(--brand-primary)"]) {
+  color: #292b30;
+}
+html[data-palette="mezy"] header[class*="var(--brand-primary)"] [class*="text-white"],
+html[data-palette="mezy"] header[class*="var(--brand-primary)"] [class*="text-[#ffe19a]"] {
+  color: #51461c;
+}
+/* Navegación clara: blanco predominante y amarillo para identificar la marca. */
+html[data-palette="mezy"] aside[class*="radial-gradient"] {
+  background: linear-gradient(180deg, #fff4b5, #ffffff 48%);
+  color: #292b30;
+  border-right: 1px solid #f1dfa2;
+  box-shadow: none;
+}
+html[data-palette="mezy"] aside[class*="radial-gradient"] [class*="text-white"] {
+  color: #51461c;
+}
+html[data-palette="mezy"] :is(.text-brand, .text-terracotta, [class*="text-[var(--brand-primary)]"]) {
+  color: #725400;
 }

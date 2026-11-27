@@ -98,7 +98,7 @@ export function AppShell({
             </button>
           </div>
         </header>
-        <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-5 pt-6 [scrollbar-gutter:stable] md:px-8 md:pb-6 lg:overflow-visible lg:py-8 xl:px-10">{children}</main>
+        <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-5 pt-6 [scrollbar-gutter:stable] md:px-8 md:pb-6 lg:overflow-visible lg:py-8 xl:px-10"><div className="app-page-layout">{children}</div></main>
 
         <nav className="z-40 mx-2 mt-2 grid shrink-0 rounded-2xl border border-border bg-white p-1 shadow-sm [margin-bottom:max(.5rem,env(safe-area-inset-bottom))] lg:hidden" style={{ gridTemplateColumns: `repeat(${visibleNavigation.length}, minmax(0, 1fr))` }} aria-label="Navegación móvil">
           {visibleNavigation.map(item => <MobileNavItem key={item.view} icon={item.icon} label={item.label} active={activeView === item.view} onClick={() => onNavigate(item.view)} />)}

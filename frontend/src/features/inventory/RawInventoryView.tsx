@@ -31,7 +31,7 @@ export function ingredientInputUnit(baseUnit: string) {
 export function IngredientImage({ url, name, unit }: { url?: string | null; name: string; unit?: string }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [url]);
-  return <div className="mb-4 grid h-32 place-items-center overflow-hidden rounded-xl bg-[var(--brand-soft)] text-[#b78a61]">
+  return <div className="mb-4 grid aspect-square w-full place-items-center overflow-hidden rounded-xl bg-[var(--brand-soft)] text-[#b78a61]">
     {url && !failed ? <img src={url} alt={name} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} className="h-full w-full object-cover" /> : <div className="text-center"><Icon name={unit === "ML" ? "droplet" : unit === "G" ? "weight-hanging" : "cubes-stacked"} className="text-3xl" /><span className="mt-2 block text-xs">{unit === "ML" ? "Volumen · L / mL" : unit === "G" ? "Peso · kg / g" : "Unidades"}</span></div>}
   </div>;
 }
@@ -168,7 +168,7 @@ export function RawInventoryView({ section, ingredients, products, categories, l
       </section>
       <section className="mt-5 overflow-hidden rounded-[24px] border border-white bg-white shadow-sm">
         <div className="grid gap-3 p-4 sm:grid-cols-2"><input className={fieldClass} type="search" value={search} onChange={(event) => onSearch(event.target.value)} placeholder="Buscar insumo por nombre" /><select aria-label="Filtrar insumos por categoría" className={fieldClass} value={categoryFilter} onChange={event => setCategoryFilter(event.target.value)}><option value="">Todas las categorías</option>{ingredientCategories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}</select><p className="text-xs text-muted">{visible.length} insumos encontrados</p></div>
-        {loading ? <BrandedLoader label="Actualizando bodega" /> : error ? <p className="p-5 text-xs text-red-700">{error}</p> : <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">{visible.map((item) => <article key={item.id} className="rounded-2xl border border-[var(--brand-border)] bg-[var(--brand-background)] p-4">
+        {loading ? <BrandedLoader label="Actualizando bodega" /> : error ? <p className="p-5 text-xs text-red-700">{error}</p> : <div className="catalog-card-grid p-4">{visible.map((item) => <article key={item.id} className="rounded-2xl border border-[var(--brand-border)] bg-[var(--brand-background)] p-4">
           <IngredientImage url={item.imageUrl} name={item.name} unit={item.baseUnit} />
           <div className="flex items-start justify-between"><div><h3 className="mt-1 text-base font-semibold">{item.name}</h3></div><StatusPill status={item.stockStatus} /></div>
           <strong className="mt-5 block text-xl font-medium tabular-nums text-[var(--brand-secondary)]">{readableQuantity(Number(item.stock), item.baseUnit)}</strong>
@@ -179,7 +179,7 @@ export function RawInventoryView({ section, ingredients, products, categories, l
     </> : <section className="mt-5">
       <div className="mb-4 grid gap-3 sm:grid-cols-2"><input aria-label="Buscar productos" className={fieldClass} type="search" value={productSearch} onChange={e => setProductSearch(e.target.value)} placeholder="Buscar producto por nombre" /><select aria-label="Filtrar productos por categoría" className={fieldClass} value={productFilter} onChange={e => setProductFilter(e.target.value)}><option value="">Todas las categorías</option>{categories.map(c => <option key={c.id} value={c.slug}>{c.name}</option>)}</select></div>
       {/* Columnas según el espacio real disponible, incluyendo el ancho ocupado por el menú lateral. */}
-      {loading || compositionLoading ? <BrandedLoader label="Cargando productos" /> : error ? <p role="alert">{error}</p> : <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(180px,1fr))] sm:gap-3">{products.filter(p => (!productFilter || p.category.slug === productFilter) && p.name.toLocaleLowerCase().includes(productSearch.toLocaleLowerCase())).map(product => {
+      {loading || compositionLoading ? <BrandedLoader label="Cargando productos" /> : error ? <p role="alert">{error}</p> : <div className="catalog-card-grid">{products.filter(p => (!productFilter || p.category.slug === productFilter) && p.name.toLocaleLowerCase().includes(productSearch.toLocaleLowerCase())).map(product => {
         const composition = recipes.find(r => r.productId === product.id);
         return <article key={product.id} className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-white p-2.5 sm:p-3">
           <DishImage key={`${product.id}-${photoRevision}`} square productId={product.id} name={product.name} source="/api/images/demo/food" />

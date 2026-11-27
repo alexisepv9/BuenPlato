@@ -17,7 +17,7 @@ export function SettingsView() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const colors = palettes[palette];
+  const colors = palettes[palette] ?? palettes.terracotta;
   useEffect(() => {
     if (!file) { setPreview(""); return; }
     const url = URL.createObjectURL(file); setPreview(url);
@@ -39,11 +39,16 @@ export function SettingsView() {
       const { data: saved } = await apiClient.put<Brand>("/branding", data, { headers: { "Content-Type": null } });
       setBrand(saved); setName(saved.name); setRevision(saved.revision); setFile(null); setRemoveLogo(false);
       setSuccess("Configuración guardada. Nombre, logo y colores actualizados en el sistema.");
-    } catch (failure) { setError(apiErrorMessage(failure)); }
+    } catch (failure) {
+      const message = apiErrorMessage(failure);
+      setError(palette === "mezy" && message.includes("Selecciona una paleta disponible")
+        ? "El backend conectado todavía no admite Donde Mezy. Reinicia el backend con la versión actual o despliega el backend actualizado en Render. Los cambios no se guardaron."
+        : message);
+    }
     finally { setBusy(false); }
   }
   const logo = preview || (!removeLogo && brand.hasLogo ? `/api/branding/logo?v=${brand.revision}` : "");
-  return <div className="mx-auto max-w-6xl">
+  return <div className="w-full min-w-0">
     <PageHeader eyebrow="Administración" title="Identidad del negocio" description="Personaliza el nombre, los colores y el logo que verán todos los usuarios." icon="sliders" />
     <FloatingAlert message={error} /><FloatingAlert message={success} tone="success" />
     <form onSubmit={save} className="mt-6 grid gap-6 xl:grid-cols-[1.1fr_1fr]">
@@ -60,18 +65,18 @@ export function SettingsView() {
           {(logo || removeLogo) && <button type="button" onClick={() => { setFile(null); setRemoveLogo(!removeLogo); }} className="mt-3 min-h-11 text-sm font-bold text-brand">{removeLogo ? "Conservar logo actual" : "Quitar logo"}</button>}
         </section>
         <section className="rounded-3xl border border-border bg-white p-5 sm:p-6">
-          <h2 className="text-lg font-extrabold">2. Paleta de colores</h2><p className="mt-2 text-xs text-muted">Colores coordinados para botones, navegación, fondos y formularios. Las alertas mantienen sus colores de seguridad.</p>
+          <h2 className="text-lg font-extrabold">2. Tema general</h2><p className="mt-2 text-xs text-muted">Selecciona una paleta para todo el sistema. Donde Mezy combina amarillo protagonista con blanco y texto oscuro. Las alertas mantienen sus colores de seguridad.</p>
           <div className="mt-5 grid grid-cols-2 gap-3" role="group" aria-label="Paleta del negocio">{Object.entries(palettes).map(([key, item]) => <button key={key} type="button" aria-pressed={palette === key} onClick={() => setPalette(key as Palette)} className={`rounded-2xl border-2 p-4 text-left transition ${palette === key ? "border-brand bg-cream" : "border-border"}`}>
-            <span className="flex gap-2">{[item.primary, item.secondary, item.background].map(color => <span key={color} className="size-7 rounded-full border border-black/10" style={{ background: color }} />)}</span><strong className="mt-3 block text-sm">{item.label}{palette === key && <Icon name="check" className="ml-2" />}</strong>
+            <span className="flex flex-wrap gap-2">{["accent" in item ? item.accent : item.primary, item.secondary, item.background].map(color => <span key={color} className="size-7 rounded-full border border-black/10" style={{ background: color }} />)}</span><strong className="mt-3 block text-sm">{item.label}{palette === key && <Icon name="check" className="ml-2" />}</strong>
           </button>)}</div>
         </section>
         <div className="flex flex-wrap gap-3"><button type="button" onClick={reset} className="min-h-12 rounded-xl border border-border bg-white px-5 text-sm font-bold">Descartar cambios</button><button className="min-h-12 flex-1 rounded-xl bg-brand px-5 text-sm font-bold text-white"><Icon name={busy ? "spinner" : "check"} className={`mr-2 ${busy ? "animate-spin" : ""}`} />{busy ? "Guardando…" : "Guardar configuración"}</button></div>
       </fieldset>
       <aside className="min-w-0 self-start rounded-3xl border border-border bg-white p-5 xl:sticky xl:top-24">
         <h2 className="font-extrabold">Vista previa</h2><p className="mt-1 text-xs text-muted">Solo una demostración: guarda para aplicar a toda la página.</p>
-        <div className="mt-5 overflow-hidden rounded-2xl border border-border" style={{ background: colors.background }}>
-          <div className="flex items-center gap-3 p-5 text-white" style={{ background: colors.secondary }}><div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl bg-white/15">{logo ? <img src={logo} alt="Vista previa del logo" className="h-full w-full bg-white object-contain p-1" /> : <Icon name="utensils" />}</div><strong className="break-words">{name || "Nombre del negocio"}</strong></div>
-          <div className="p-5"><span className="text-xs font-bold" style={{ color: colors.primary }}>PUNTO DE VENTA</span><h3 className="mt-2 text-xl font-extrabold">Todo listo para atender</h3><div className="my-5 rounded-xl bg-white p-4 text-sm shadow-sm">Menú del día <strong className="float-right">$6.900</strong></div><span className="block rounded-xl p-3 text-center text-sm font-bold text-white" style={{ background: colors.primary }}>Agregar al pedido</span></div>
+        <div className="mt-5 overflow-hidden rounded-2xl border border-border" style={{ background: colors.background, borderTop: `6px solid ${"accent" in colors ? colors.accent : colors.primary}` }}>
+          <div className="flex items-center gap-3 p-5" style={{ background: palette === "mezy" ? colors.primary : colors.secondary, color: palette === "mezy" ? "#292b30" : "white" }}><div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl bg-white/15">{logo ? <img src={logo} alt="Vista previa del logo" className="h-full w-full bg-white object-contain p-1" /> : <Icon name="utensils" />}</div><strong className="break-words">{name || "Nombre del negocio"}</strong></div>
+          <div className="p-5"><span className="text-xs font-bold" style={{ color: palette === "mezy" ? colors.secondary : colors.primary }}>PUNTO DE VENTA</span><h3 className="mt-2 text-xl font-extrabold">Todo listo para atender</h3><div className="my-5 rounded-xl bg-white p-4 text-sm shadow-sm">Menú del día <strong className="float-right">$6.900</strong></div><span className="block rounded-xl p-3 text-center text-sm font-bold" style={{ background: colors.primary, color: palette === "mezy" ? "#292b30" : "white" }}>Agregar al pedido</span></div>
         </div>
         <p className="mt-4 text-xs leading-5 text-muted">Se aplica al login, Venta, Inventario, Finanzas y Configuración. Las demás sesiones se actualizan en un máximo aproximado de 30 segundos o al volver a la ventana.</p>
         {failed && <p role="alert" className="mt-3 text-sm text-red-700">No se pudo cargar la configuración. Espera la reconexión antes de editar.</p>}

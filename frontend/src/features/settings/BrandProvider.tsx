@@ -3,6 +3,8 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { apiClient } from "../../lib/api";
 
 export const palettes = {
+  // Amarillo protagonista sobre blanco; las superficies amarillas usan texto oscuro.
+  mezy: { label: "Donde Mezy", primary: "#ffd21c", secondary: "#725400", background: "#ffffff", soft: "#fff8d6", accent: "#ffd21c" },
   terracotta: { label: "Terracota", primary: "#b9472e", secondary: "#853951", background: "#fff8ef", soft: "#fbece5" },
   ocean: { label: "Océano", primary: "#146a91", secondary: "#465694", background: "#f2f8fc", soft: "#e2f0f8" },
   plum: { label: "Ciruela", primary: "#81439a", secondary: "#a43b64", background: "#faf5fc", soft: "#f1e5f6" },
@@ -16,7 +18,9 @@ const BrandContext = createContext<{ brand: Brand; ready: boolean; failed: boole
 /** Tokens semánticos: la misma función visual mantiene el mismo color en cada pantalla. */
 export function applyPalette(key: Palette) {
   const palette = palettes[key] ?? palettes.terracotta;
+  document.documentElement.dataset.palette = key;
   const tokens = { primary: palette.primary, secondary: palette.secondary, background: palette.background, soft: palette.soft,
+    accent: "accent" in palette ? palette.accent : "#f2b544",
     border: `color-mix(in srgb, ${palette.primary} 18%, white)`, ink: "#292b30", muted: "#697078" };
   for (const [name, value] of Object.entries(tokens)) document.documentElement.style.setProperty(`--brand-${name}`, value);
 }

@@ -37,7 +37,7 @@ public class BrandSettingsService {
         name = name == null ? "" : name.trim();
         if (name.isEmpty() || name.length() > 80 || name.chars().anyMatch(Character::isISOControl))
             throw new IllegalArgumentException("El nombre debe contener entre 1 y 80 caracteres, sin saltos de línea.");
-        if (!Set.of("terracotta", "ocean", "plum", "forest").contains(palette))
+        if (!Set.of("terracotta", "ocean", "plum", "forest", "mezy").contains(palette))
             throw new IllegalArgumentException("Selecciona una paleta disponible.");
         if (removeLogo && file != null && !file.isEmpty()) throw new IllegalArgumentException("Elige reemplazar o quitar el logo, no ambas opciones.");
         String logo = file != null && !file.isEmpty() ? encodeLogo(file) : null;

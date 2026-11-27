@@ -19,7 +19,8 @@ export default function App() {
   const { ready: brandReady } = useBrand();
   const [authUser, setAuthUser] = useState<AuthUser | null | undefined>(undefined);
   const [sessionNotice, setSessionNotice] = useState("");
-  const [view, setView] = useState<View>("ingredients");
+  // Venta es la entrada predeterminada, incluso al recargar con una sesión vigente.
+  const [view, setView] = useState<View>("sales");
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
